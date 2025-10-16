@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="wrapper"><section class="hero-card">
+<h1>التواصل مع الإدارة</h1>
+<div class="form-card">
+  <label>اسمك</label><input id="name">
+  <label>بريدك الإلكتروني</label><input id="email" placeholder="example@domain.com">
+  <label>نوع الرسالة</label><input id="type" placeholder="دعم - ملاحظة - طلب حساب">
+  <label>الموضوع</label><input id="subject">
+  <label>نص الرسالة</label><textarea id="body" rows="6"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-prim" onclick="send()">إرسال</button>
+    <a class="btn btn-ghost" href="./index.html">العودة</a>
+  </div>
+  <div id="out" class="sub"></div>
+</div>
+</section></main>
+<script>
+function send(){
+  fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    sender_name: name.value.trim(),
+    sender_email: email.value.trim(),
+    type: type.value.trim(),
+    subject: subject.value.trim(),
+    body: body.value.trim()
+  })}).then(r=>r.json()).then(d=>{
+    out.textContent = d.ok ? 'تم الإرسال، شكرًا لتواصلك.' : 'تعذر الإرسال';
+  }).catch(()=> out.textContent='تعذر الاتصال');
+}
+</script></body></html>

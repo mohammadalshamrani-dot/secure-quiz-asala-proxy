@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إنشاء اختبار</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="wrapper"><section class="hero-card">
+<h1>إنشاء اختبار</h1>
+<div class="form-card">
+  <label>عنوان الاختبار</label><input id="title" placeholder="مثال: كويز مبادئ القانون - الأسبوع 3">
+  <div id="qs"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-ghost" onclick="addMCQ()">سؤال متعدد</button>
+    <button class="btn btn-ghost" onclick="addTF()">سؤال صح/خطأ</button>
+    <button class="btn btn-prim" onclick="save()">إنشاء الاختبار</button>
+    <a class="btn" href="./dashboard.html">لوحة النتائج</a>
+  </div>
+  <div id="out" class="sub"></div>
+</div>
+</section></main>
+<script>
+const token=localStorage.getItem('token'); if(!token) location.href='./login.html';
+const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+function itemTemplate(){return `<div class='q' style='border:1px solid #eee;padding:12px;border-radius:12px;margin-top:10px'>
+  <div class='row'><div class='grow'><label>نص السؤال</label><input class='qt'></div>
+  <div><label>المدة (ثوانٍ)</label><input class='secs' type='number' min='5' value='30' style='width:120px'></div></div>`;}
+function addMCQ(){const n=document.createElement('div'); n.innerHTML=itemTemplate()+`
+  <div class='row'><div class='grow'><input class='opt' placeholder='اختيار 1'></div><div class='grow'><input class='opt' placeholder='اختيار 2'></div></div>
+  <div class='row'><div class='grow'><input class='opt' placeholder='اختيار 3'></div><div class='grow'><input class='opt' placeholder='اختيار 4'></div></div>
+  <label>الإجابة الصحيحة (1-4)</label><input class='ans' type='number' min='1' max='4' value='1'></div>`; qs.appendChild(n.firstChild);}
+function addTF(){const n=document.createElement('div'); n.innerHTML=itemTemplate()+`
+  <div class='row'><div class='grow'><input class='opt' value='صح'></div><div class='grow'><input class='opt' value='خطأ'></div></div>
+  <label>الإجابة الصحيحة (1-2)</label><input class='ans' type='number' min='1' max='2' value='1'></div>`; qs.appendChild(n.firstChild);}
+function save(){
+  const title=document.getElementById('title').value.trim();
+  const qsArr=Array.from(document.querySelectorAll('.q')).map(q=>{
+    const qt=q.querySelector('.qt').value.trim();
+    const secs=parseInt(q.querySelector('.secs').value,10)||30;
+    const opts=Array.from(q.querySelectorAll('.opt')).map(o=>o.value.trim());
+    const ans=parseInt(q.querySelector('.ans').value,10)-1;
+    if(!qt||opts.some(o=>!o)||ans<0||ans>=opts.length) return null;
+    return { type: opts.length===2?'tf':'mcq', secs, question:qt, options:opts, answer:ans };
+  });
+  if (qsArr.length===0 || qsArr.some(x=>x===null)) return alert('تأكد من تعبئة كل الحقول');
+  fetch('/api/quizzes',{method:'POST',headers:H,body:JSON.stringify({title,questions:qsArr})})
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok){ alert('تعذر الإنشاء'); return; }
+      const link = location.origin + d.link;
+      out.innerHTML = `تم الإنشاء: <a href="${d.link}" target="_blank">${link}</a> <button class="btn" onclick="navigator.clipboard.writeText('${link}')">نسخ الرابط</button>`;
+    }).catch(()=> alert('خطأ في الاتصال'));
+}
+</script></body></html>

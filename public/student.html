@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الاختبار القصير</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="wrapper"><section class="hero-card">
+<h1>أداء الاختبار</h1>
+<div id="info" class="sub"></div>
+<div id="quizBox" class="form-card"></div>
+<div id="result" class="sub"></div>
+<div class="sub" style="margin-top:8px">تعليمات: لا تغادر الصفحة أثناء الاختبار. لكل سؤال وقت محدد. بعد الإرسال ستظهر نتيجتك مباشرة.</div>
+</section></main>
+<script>
+const id=new URLSearchParams(location.search).get('id'); let leftPage=false;
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ leftPage=true; alert('تم رصد خروج من الصفحة. سيتم إنهاء الاختبار.'); finish(); } });
+function render(qz){
+  window.qz=qz; info.textContent='رمز الاختبار: '+qz.id + (qz.title?(' — '+qz.title):'');
+  let i=0, score=0;
+  function show(){ if(i>=qz.questions.length) return finish();
+    const q=qz.questions[i];
+    const opts=q.options.map((o,oi)=>`<label style="display:block;margin:4px 0"><input type="radio" name="ans" value="${oi}"> ${o}</label>`).join('');
+    quizBox.innerHTML=`<b>${i+1}) ${q.question}</b> <div class="sub">الوقت المتاح: <span id="t">${q.secs}</span> ثانية</div>${opts}
+      <div class="row" style="margin-top:10px"><button class="btn btn-prim" id="next">التالي</button></div>`;
+    let t=q.secs; const timer=setInterval(()=>{ t--; const el=document.getElementById('t'); if(el) el.textContent=t; if(t<=0){clearInterval(timer); go();}},1000);
+    next.onclick=()=>{ clearInterval(timer); go(); };
+    function go(){ const c=document.querySelector('[name=ans]:checked'); const v=c?parseInt(c.value,10):-1; if(v===q.answer) score++; i++; show(); }
+  }
+  window.finish=function(){ quizBox.innerHTML=''; result.innerHTML=`درجة الاختبار: <b>${score}</b> / ${qz.questions.length}`;
+    fetch('/api/results',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:qz.id,score,total:qz.questions.length,left_page:leftPage,meta:{ua:navigator.userAgent}})}); };
+  show();
+}
+fetch('/api/quiz/'+id).then(r=>r.json()).then(d=>{ if(d && d.questions) render(d); else quizBox.textContent='رابط غير صالح'; })
+  .catch(()=> quizBox.textContent='تعذر تحميل الاختبار');
+</script></body></html>

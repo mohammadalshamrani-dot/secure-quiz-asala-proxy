@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة المدرّس</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="wrapper"><section class="hero-card">
+<h1>لوحة المدرّس</h1>
+<div class="row" style="margin-bottom:8px">
+  <button class="btn btn-prim" onclick="location.href='./admin.html'">إنشاء اختبار</button>
+  <button class="btn btn-ghost" onclick="loadQuizzes()">تحديث قائمتي</button>
+  <button class="btn" onclick="print()">طباعة الصفحة</button>
+</div>
+<div id="list" class="form-card"></div>
+
+<div id="results" class="form-card" style="margin-top:12px"></div>
+
+<div class="form-card" style="margin-top:12px">
+  <h3>إعدادات الحساب</h3>
+  <label>البريد الإلكتروني</label><input id="email">
+  <label>اسم المستخدم</label><input id="username">
+  <div class="row"><button class="btn btn-ghost" onclick="saveProfile()">حفظ</button></div>
+  <label>تغيير كلمة المرور</label>
+  <input id="oldp" type="password" placeholder="القديمة">
+  <input id="newp" type="password" placeholder="الجديدة">
+  <div class="row"><button class="btn btn-ghost" onclick="changePass()">تغيير</button></div>
+</div>
+
+<div id="inboxCard" class="form-card" style="margin-top:12px; display:none">
+  <h3>الرسائل الواردة (الإدارة)</h3>
+  <div id="inbox"></div>
+</div>
+
+</section></main>
+<script>
+const token=localStorage.getItem('token'); if(!token) location.href='./login.html';
+const H={'Authorization':'Bearer '+token, 'Content-Type':'application/json'};
+
+let ME=null;
+fetch('/api/auth/me',{headers:H}).then(r=>r.json()).then(d=>{
+  ME=d.teacher; if(ME && ME.is_admin){ document.getElementById('inboxCard').style.display='block'; loadInbox(); }
+});
+
+function loadQuizzes(){
+  fetch('/api/my_quizzes',{headers:H}).then(r=>r.json()).then(d=>{
+    const html=(d.items||[]).map(q=>`<div class="row" style="align-items:center">
+      <div class="grow"><b>${q.title||'اختبار بدون عنوان'}</b><div class="sub">${new Date(q.created_at).toLocaleString()}</div></div>
+      <button class="btn" onclick="openResults('${q.id}')">نتائج هذا الاختبار</button>
+      <a class="btn btn-ghost" href="./student.html?id=${q.id}" target="_blank">رابط الطالب</a>
+      <button class="btn" onclick="copyLink('${q.id}')">نسخ الرابط</button>
+    </div>`).join('');
+    list.innerHTML = html || 'لا توجد اختبارات بعد';
+  });
+}
+function copyLink(id){ navigator.clipboard.writeText(location.origin+'/student.html?id='+id).then(()=>alert('تم نسخ الرابط')); }
+function openResults(id){
+  fetch('/api/quiz_results/'+id,{headers:H}).then(r=>r.json()).then(d=>{
+    const rows=(d.items||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${r.student_name||'—'}</td><td>${r.score}/${r.total}</td><td>${new Date(r.created_at).toLocaleString()}</td><td>${r.left_page?'خرج من الصفحة':''}</td></tr>`).join('');
+    results.innerHTML = `<h3>نتائج الاختبار ${id}</h3>
+      <button class="btn" onclick="window.print()">طباعة</button>
+      <button class="btn btn-ghost" onclick='exportCSV(${JSON.stringify([])})'>تصدير CSV</button>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th>#</th><th>اسم الطالب</th><th>الدرجة</th><th>التاريخ</th><th>ملاحظة</th></tr></thead><tbody>${rows}</tbody></table>`;
+    window.exportCSV = function(){
+      const lines=['#,student_name,score,total,created_at,left_page'];
+      (d.items||[]).forEach((r,i)=> lines.push([i+1,r.student_name||'',r.score,r.total,r.created_at,r.left_page].join(',')));
+      const blob=new Blob([lines.join('\\n')],{type:'text/csv'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='results-'+id+'.csv'; a.click();
+    }
+  });
+}
+function saveProfile(){ fetch('/api/auth/update_profile',{method:'POST',headers:H,body:JSON.stringify({email:email.value,username:username.value})}).then(r=>r.json()).then(d=>alert(d.ok?'تم الحفظ':'تعذر الحفظ')); }
+function changePass(){ fetch('/api/auth/change_password',{method:'POST',headers:H,body:JSON.stringify({old_password:oldp.value,new_password:newp.value})}).then(r=>r.json()).then(d=>alert(d.ok?'تم التغيير':'تعذر التغيير')); }
+
+function loadInbox(){
+  fetch('/api/messages',{headers:H}).then(r=>r.json()).then(d=>{
+    if(!d.ok){ inbox.textContent='تعذر تحميل الوارد'; return; }
+    if(!d.items || !d.items.length){ inbox.textContent='لا توجد رسائل.'; return; }
+    inbox.innerHTML = d.items.map(m=>`<div style="border:1px solid #eee;padding:10px;border-radius:12px;margin-bottom:8px">
+      <div><b>${m.subject||'(بدون موضوع)'}</b> — <span class="sub">${new Date(m.created_at).toLocaleString()}</span></div>
+      <div class="sub">${m.sender_name||''} &lt;${m.sender_email||''}&gt;</div>
+      <div style="margin-top:6px">${(m.body||'').replaceAll('<','&lt;')}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" onclick="replyMsg(${m.id})">رد</button>
+        <button class="btn btn-ghost" onclick="delMsg(${m.id})">حذف</button>
+      </div>
+    </div>`).join('');
+  });
+}
+function replyMsg(id){
+  const body = prompt('أدخل نص الرد لإرساله عبر البريد'); if(!body) return;
+  fetch('/api/messages/reply/'+id,{method:'POST',headers:H,body:JSON.stringify({body})}).then(r=>r.json()).then(d=>{
+    alert(d.ok?'تم الإرسال':'تعذر الإرسال'); if(d.ok) loadInbox();
+  });
+}
+function delMsg(id){
+  if(!confirm('تأكيد الحذف؟')) return;
+  fetch('/api/messages/'+id,{method:'DELETE',headers:H}).then(r=>r.json()).then(d=>{ if(d.ok) loadInbox(); });
+}
+
+loadQuizzes();
+</script></body></html>
