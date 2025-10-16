@@ -11,6 +11,7 @@
     <button class="btn btn-prim" onclick="login()">دخول</button>
     <a class="btn btn-ghost" href="./index.html">الرئيسية</a>
     <a class="btn" href="./reset.html">نسيت كلمة المرور؟</a>
+    <a class="btn" href="./signup.html">تسجيل جديد</a>
   </div>
 </div>
 </section></main>
@@ -19,7 +20,7 @@ function login(){
   fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ username: u.value.trim(), password: p.value })})
     .then(r=>r.json()).then(d=>{
-      if(!d.ok){ alert('بيانات غير صحيحة'); return; }
+      if(!d.ok){ alert(d.error==='not approved'?'حسابك بانتظار موافقة الإدارة':'بيانات غير صحيحة'); return; }
       localStorage.setItem('token', d.token);
       location.href='./dashboard.html';
     }).catch(()=> alert('تعذر الاتصال'));

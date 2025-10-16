@@ -1,6 +1,6 @@
 {
   "name": "secure-quiz-asala-proxy",
-  "version": "2.0.0",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {

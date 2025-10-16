@@ -29,6 +29,20 @@
   <div id="inbox"></div>
 </div>
 
+
+<div id="adminCard" class="form-card" style="margin-top:12px; display:none">
+  <h3>إدارة المستخدمين (الإدارة)</h3>
+  <h4>طلبات تسجيل بانتظار الموافقة</h4>
+  <div id="pendingBox" class="sub">جاري التحميل…</div>
+  <h4 style="margin-top:12px">تعيين/إعادة كلمة مرور لعضو</h4>
+  <div class="row">
+    <input id="rp_email" placeholder="البريد الإلكتروني">
+    <input id="rp_username" placeholder="اسم المستخدم">
+    <input id="rp_newpass" placeholder="كلمة مرور جديدة">
+    <button class="btn" onclick="resetTeacher()">حفظ</button>
+  </div>
+</div>
+
 </section></main>
 <script>
 const token=localStorage.getItem('token'); if(!token) location.href='./login.html';
@@ -36,7 +50,7 @@ const H={'Authorization':'Bearer '+token, 'Content-Type':'application/json'};
 
 let ME=null;
 fetch('/api/auth/me',{headers:H}).then(r=>r.json()).then(d=>{
-  ME=d.teacher; if(ME && ME.is_admin){ document.getElementById('inboxCard').style.display='block'; loadInbox(); }
+  ME=d.teacher; if(ME && ME.is_admin){ document.getElementById('inboxCard').style.display='block'; document.getElementById('adminCard').style.display='block'; loadInbox(); loadPending(); }
 });
 
 function loadQuizzes(){
@@ -54,7 +68,7 @@ function copyLink(id){ navigator.clipboard.writeText(location.origin+'/student.h
 function openResults(id){
   fetch('/api/quiz_results/'+id,{headers:H}).then(r=>r.json()).then(d=>{
     const rows=(d.items||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${r.student_name||'—'}</td><td>${r.score}/${r.total}</td><td>${new Date(r.created_at).toLocaleString()}</td><td>${r.left_page?'خرج من الصفحة':''}</td></tr>`).join('');
-    results.innerHTML = `<h3>نتائج الاختبار ${id}</h3>
+    results.innerHTML = `<div style='display:flex;align-items:center;gap:10px'><img src='./assets/logo-alasala.png' style='height:42px'><div><h3 style='margin:0'>نتائج الاختبار ${id}</h3><div class='sub'>منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</div></div></div>
       <button class="btn" onclick="window.print()">طباعة</button>
       <button class="btn btn-ghost" onclick='exportCSV(${JSON.stringify([])})'>تصدير CSV</button>
       <table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr><th>#</th><th>اسم الطالب</th><th>الدرجة</th><th>التاريخ</th><th>ملاحظة</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -96,4 +110,29 @@ function delMsg(id){
 }
 
 loadQuizzes();
+function loadPending(){
+  fetch('/api/admin/pending_teachers',{headers:H}).then(r=>r.json()).then(d=>{
+    if(!d.ok){ pendingBox.textContent='تعذر التحميل'; return; }
+    if(!d.items || !d.items.length){ pendingBox.textContent='لا توجد طلبات حالياً.'; return; }
+    pendingBox.innerHTML = d.items.map(m=>`<div class="row" style="align-items:center">
+      <div class="grow"><b>${m.username}</b> — ${m.email} <span class="sub">(${new Date(m.created_at).toLocaleString()})</span></div>
+      <button class="btn btn-prim" onclick="approve(${m.id})">موافقة</button>
+      <button class="btn btn-ghost" onclick="reject(${m.id})">رفض</button>
+    </div>`).join('');
+  });
+}
+function approve(id){
+  fetch('/api/admin/approve_teacher',{method:'POST',headers:H,body:JSON.stringify({id})}).then(r=>r.json()).then(()=>loadPending());
+}
+function reject(id){
+  if(!confirm('تأكيد الرفض والحذف؟')) return;
+  fetch('/api/admin/reject_teacher',{method:'POST',headers:H,body:JSON.stringify({id})}).then(r=>r.json()).then(()=>loadPending());
+}
+function resetTeacher(){
+  const email=rp_email.value.trim(), username=rp_username.value.trim(), new_password=rp_newpass.value;
+  if(!email||!username||!new_password){ alert('املأ البيانات'); return; }
+  fetch('/api/admin/reset_teacher',{method:'POST',headers:H,body:JSON.stringify({email,username,new_password})}).then(r=>r.json()).then(d=>{
+    alert(d.ok?'تم التحديث بنجاح':'تعذر التحديث');
+  });
+}
 </script></body></html>

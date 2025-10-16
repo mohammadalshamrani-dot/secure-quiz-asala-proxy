@@ -33,10 +33,12 @@ async function init(){
       username TEXT UNIQUE NOT NULL,
       pass_hash TEXT NOT NULL,
       is_admin BOOLEAN DEFAULT false,
+      approved BOOLEAN DEFAULT false,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
   await pool.query(`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;`);
+  await pool.query(`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false;`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quizzes (
       id TEXT PRIMARY KEY,
@@ -72,8 +74,8 @@ async function init(){
   const { rows } = await pool.query("SELECT COUNT(*)::int AS c FROM teachers");
   if (rows[0].c === 0){
     const hash = await bcrypt.hash("AaBbCc123", 10);
-    await pool.query("INSERT INTO teachers (email, username, pass_hash, is_admin) VALUES ($1,$2,$3,$4)",
-      ["admin@example.com", "admin", hash, true]);
+    await pool.query("INSERT INTO teachers (email, username, pass_hash, is_admin, approved) VALUES ($1,$2,$3,$4,true)",
+      ["admin@example.com", "Admin", hash, true]);
     console.log("Bootstrapped admin: admin / AaBbCc123");
   }
 }
@@ -107,17 +109,35 @@ app.get("/api/health", async (req,res)=>{
 app.post("/api/auth/login", async (req,res)=>{
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error:"missing" });
+
+app.post("/api/auth/register", async (req,res)=>{
+  try{
+    const { email, username, password } = req.body || {};
+    if (!email || !username || !password) return res.status(400).json({ error:"missing" });
+    // basic domain tie if needed in future: alasala.edu.sa
+    // if (!/@alasala\.edu\.sa$/i.test(email)) return res.status(400).json({ error:"email domain not allowed" });
+    const exists = await pool.query("SELECT 1 FROM teachers WHERE email=$1 OR username=$2",[email, username]);
+    if (exists.rows.length) return res.status(409).json({ error:"exists" });
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query("INSERT INTO teachers (email, username, pass_hash, approved) VALUES ($1,$2,$3,false)",[email, username, hash]);
+    res.status(201).json({ ok:true, pending:true });
+  }catch(e){
+    res.status(500).json({ error:"register failed" });
+  }
+});
+
   const q = await pool.query("SELECT * FROM teachers WHERE username=$1 OR email=$1", [username]);
   if (!q.rows.length) return res.status(401).json({ error:"invalid" });
   const t = q.rows[0];
   const ok = await bcrypt.compare(password, t.pass_hash);
   if (!ok) return res.status(401).json({ error:"invalid" });
+  if (!t.is_admin && !t.approved) return res.status(403).json({ error:"not approved" });
   const token = signToken(t);
   res.json({ ok:true, token, teacher:{ id:t.id, email:t.email, username:t.username, is_admin: !!t.is_admin } });
 });
 
 app.get("/api/auth/me", auth, async (req,res)=>{
-  const q = await pool.query("SELECT id, email, username, is_admin FROM teachers WHERE id=$1",[req.user.id]);
+  const q = await pool.query("SELECT id, email, username, is_admin, approved FROM teachers WHERE id=$1",[req.user.id]);
   if (!q.rows.length) return res.status(401).json({ error:"no user" });
   res.json({ ok:true, teacher: q.rows[0] });
 });
@@ -237,6 +257,28 @@ app.get("/api/quiz_results/:id", auth, async (req,res)=>{
 });
 
 // Static
+
+// Admin: list pending teachers
+app.get("/api/admin/pending_teachers", auth, adminOnly, async (req,res)=>{
+  const { rows } = await pool.query("SELECT id, email, username, created_at FROM teachers WHERE approved=false AND is_admin=false ORDER BY created_at ASC");
+  res.json({ ok:true, items: rows });
+});
+// Admin: approve
+app.post("/api/admin/approve_teacher", auth, adminOnly, async (req,res)=>{
+  const { id } = req.body || {};
+  if(!id) return res.status(400).json({ error:"missing" });
+  await pool.query("UPDATE teachers SET approved=true WHERE id=$1", [id]);
+  res.json({ ok:true });
+});
+// Admin: reject (delete)
+app.post("/api/admin/reject_teacher", auth, adminOnly, async (req,res)=>{
+  const { id } = req.body || {};
+  if(!id) return res.status(400).json({ error:"missing" });
+  await pool.query("DELETE FROM teachers WHERE id=$1 AND is_admin=false", [id]);
+  res.json({ ok:true });
+});
+
+
 app.use(express.static(path.join(__dirname, "public")));
 app.get("*", (req,res)=> res.sendFile(path.join(__dirname, "public", "index.html")));
 

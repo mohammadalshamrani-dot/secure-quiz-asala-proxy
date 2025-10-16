@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تسجيل عضو هيئة التدريس</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="wrapper"><section class="hero-card">
+<h1>تسجيل عضو هيئة التدريس</h1>
+<div class="form-card">
+  <label>البريد الإلكتروني الجامعي</label><input id="email" placeholder="example@alasala.edu.sa">
+  <label>اسم المستخدم (يوزر نيم)</label><input id="username" placeholder="username">
+  <label>كلمة المرور</label><input id="password" type="password" placeholder="••••••••">
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-prim" onclick="signup()">تسجيل</button>
+    <a class="btn btn-ghost" href="./login.html">عودة للدخول</a>
+  </div>
+  <div id="out" class="sub"></div>
+</div>
+</section></main>
+<script>
+function signup(){
+  const emailV = email.value.trim();
+  const userV  = username.value.trim();
+  const passV  = password.value;
+  if(!emailV || !userV || !passV){ out.textContent='الرجاء تعبئة جميع الحقول'; return; }
+  fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email: emailV, username: userV, password: passV })})
+    .then(r=>r.json()).then(d=>{
+      if(!d.ok){ out.textContent=(d.error==='exists'?'هذا البريد أو اليوزر مستخدم من قبل':'تعذر التسجيل'); return; }
+      out.textContent='تم إرسال طلبك. سيصلك إشعار بعد موافقة الإدارة.';
+    }).catch(()=> out.textContent='تعذر الاتصال');
+}
+</script></body></html>
