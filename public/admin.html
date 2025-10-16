@@ -1,50 +1,57 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>إنشاء اختبار</title><link rel="stylesheet" href="./style.css"></head>
-<body><main class="wrapper"><section class="hero-card">
-<h1>إنشاء اختبار</h1>
-<div class="form-card">
-  <label>عنوان الاختبار</label><input id="title" placeholder="مثال: كويز مبادئ القانون - الأسبوع 3">
-  <div id="qs"></div>
-  <div class="row" style="margin-top:10px">
-    <button class="btn btn-ghost" onclick="addMCQ()">سؤال متعدد</button>
-    <button class="btn btn-ghost" onclick="addTF()">سؤال صح/خطأ</button>
-    <button class="btn btn-prim" onclick="save()">إنشاء الاختبار</button>
-    <a class="btn" href="./dashboard.html">لوحة النتائج</a>
-  </div>
-  <div id="out" class="sub"></div>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>منصة إنشاء الاختبارات</title><link rel="stylesheet" href="./style.css"></head>
+<body><header class="header">
+  <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
+  <nav class="nav">
+    <a class="navlink" href="./home.html">الرئيسية</a>
+    <a class="navlink" href="./instructions.html">تعليمات سريعة</a>
+    <a class="navlink" href="./login.html">دخول أعضاء هيئة التدريس</a>
+    <a class="navlink" href="./contact.html">تواصل مع الإدارة</a>
+    <a class="navlink" href="./admin-login.html">الإدارة</a>
+  </nav>
+</header>
+<main class="wrapper"><section class="hero-card">
+<h1>منصة إنشاء الاختبارات (داخلية)</h1>
+<label>عنوان الاختبار</label><input id="title" placeholder="مثال: اختبار القانون الدستوري – كويز 1">
+<label>الزمن لكل سؤال (ثوان)</label><input id="perq" value="30">
+<div class="row"><label><input type="checkbox" id="once"> محاولة واحدة فقط للطالب</label></div>
+<div id="qbox"></div>
+<div class="row" style="margin-top:10px">
+  <button class="btn" onclick="addTF()">إضافة سؤال صح/خطأ</button>
+  <button class="btn" onclick="addMC()">إضافة سؤال من متعدد</button>
+  <button class="btn btn-prim" onclick="save()">حفظ وتوليد رابط للطلاب</button>
 </div>
-</section></main>
+<div id="out" class="sub"></div>
+</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
 <script>
-const token=localStorage.getItem('token'); if(!token) location.href='./login.html';
-const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-function itemTemplate(){return `<div class='q' style='border:1px solid #eee;padding:12px;border-radius:12px;margin-top:10px'>
-  <div class='row'><div class='grow'><label>نص السؤال</label><input class='qt'></div>
-  <div><label>المدة (ثوانٍ)</label><input class='secs' type='number' min='5' value='30' style='width:120px'></div></div>`;}
-function addMCQ(){const n=document.createElement('div'); n.innerHTML=itemTemplate()+`
-  <div class='row'><div class='grow'><input class='opt' placeholder='اختيار 1'></div><div class='grow'><input class='opt' placeholder='اختيار 2'></div></div>
-  <div class='row'><div class='grow'><input class='opt' placeholder='اختيار 3'></div><div class='grow'><input class='opt' placeholder='اختيار 4'></div></div>
-  <label>الإجابة الصحيحة (1-4)</label><input class='ans' type='number' min='1' max='4' value='1'></div>`; qs.appendChild(n.firstChild);}
-function addTF(){const n=document.createElement('div'); n.innerHTML=itemTemplate()+`
-  <div class='row'><div class='grow'><input class='opt' value='صح'></div><div class='grow'><input class='opt' value='خطأ'></div></div>
-  <label>الإجابة الصحيحة (1-2)</label><input class='ans' type='number' min='1' max='2' value='1'></div>`; qs.appendChild(n.firstChild);}
+let qs=[];
+const H=()=>({Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'});
+function addTF(){qs.push({type:'tf',text:'',answer:true}); render();}
+function addMC(){qs.push({type:'mc',text:'',options:['','','',''],answer:0}); render();}
+function render(){qbox.innerHTML = qs.map((q,i)=> q.type==='tf' ? `
+ <div class='form-card'><b>س${i+1} (صح/خطأ)</b>
+ <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+ <select onchange='qs[${i}].answer=this.value==="true"'>
+   <option value="true" ${q.answer?'selected':''}>صح</option>
+   <option value="false" ${!q.answer?'selected':''}>خطأ</option>
+ </select>
+ <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button>
+ </div>` : `
+ <div class='form-card'><b>س${i+1} (متعدد)</b>
+ <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+ ${q.options.map((o,j)=>`<div class='row'><input class='grow' value='${o}' oninput='qs[${i}].options[${j}]=this.value'><label><input type="radio" name="a${i}" ${q.answer===j?'checked':''} onclick='qs[${i}].answer=${j}'> إجابة صحيحة</label></div>`).join('')}
+ <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button>
+ </div>`).join('');}
+function delQ(i){qs.splice(i,1); render();}
 function save(){
-  const title=document.getElementById('title').value.trim();
-  const qsArr=Array.from(document.querySelectorAll('.q')).map(q=>{
-    const qt=q.querySelector('.qt').value.trim();
-    const secs=parseInt(q.querySelector('.secs').value,10)||30;
-    const opts=Array.from(q.querySelectorAll('.opt')).map(o=>o.value.trim());
-    const ans=parseInt(q.querySelector('.ans').value,10)-1;
-    if(!qt||opts.some(o=>!o)||ans<0||ans>=opts.length) return null;
-    return { type: opts.length===2?'tf':'mcq', secs, question:qt, options:opts, answer:ans };
-  });
-  if (qsArr.length===0 || qsArr.some(x=>x===null)) return alert('تأكد من تعبئة كل الحقول');
-  fetch('/api/quizzes',{method:'POST',headers:H,body:JSON.stringify({title,questions:qsArr})})
-    .then(r=>r.json()).then(d=>{
-      if(!d.ok){ alert('تعذر الإنشاء'); return; }
-      const link = location.origin + d.link;
-      out.innerHTML = `تم الإنشاء: <a href="${d.link}" target="_blank">${link}</a> <button class="btn" onclick="navigator.clipboard.writeText('${link}')">نسخ الرابط</button>`;
-    }).catch(()=> alert('خطأ في الاتصال'));
+ const body={ title:title.value.trim(), per_question_seconds:+perq.value||30, only_one_attempt: once.checked, questions: qs };
+ fetch('/api/quiz',{method:'POST',headers:H(),body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
+  if(!d.ok){ out.textContent='تأكد من إدخال العنوان والأسئلة'; return; }
+  const link = location.origin + '/student.html?id=' + d.link_id;
+  out.innerHTML = `تم الإنشاء. رابط الطالب: <a href="${link}" target="_blank">${link}</a> <button class='btn' onclick='copy("${link}")'>نسخ الرابط</button>`;
+ });
 }
+function copy(t){navigator.clipboard.writeText(t); alert('تم نسخ الرابط');}
+fetch('/api/auth/me',{headers:H()}).then(r=>r.json()).then(d=>{ if(!d.me) location.href='./login.html'; });
 </script></body></html>

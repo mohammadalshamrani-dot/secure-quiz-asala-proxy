@@ -1,32 +1,26 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>التواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head>
-<body><main class="wrapper"><section class="hero-card">
-<h1>التواصل مع الإدارة</h1>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head>
+<body><header class="header">
+  <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
+  <nav class="nav">
+    <a class="navlink" href="./home.html">الرئيسية</a>
+    <a class="navlink" href="./instructions.html">تعليمات سريعة</a>
+    <a class="navlink" href="./login.html">دخول أعضاء هيئة التدريس</a>
+    <a class="navlink" href="./contact.html">تواصل مع الإدارة</a>
+    <a class="navlink" href="./admin-login.html">الإدارة</a>
+  </nav>
+</header>
+<main class="wrapper"><section class="hero-card">
+<h1>تواصل مع الإدارة</h1>
 <div class="form-card">
-  <label>اسمك</label><input id="name">
-  <label>بريدك الإلكتروني</label><input id="email" placeholder="example@domain.com">
-  <label>نوع الرسالة</label><input id="type" placeholder="دعم - ملاحظة - طلب حساب">
-  <label>الموضوع</label><input id="subject">
-  <label>نص الرسالة</label><textarea id="body" rows="6"></textarea>
-  <div class="row" style="margin-top:10px">
-    <button class="btn btn-prim" onclick="send()">إرسال</button>
-    <a class="btn btn-ghost" href="./index.html">العودة</a>
-  </div>
-  <div id="out" class="sub"></div>
+  <label>الاسم</label><input id="n">
+  <label>البريد الإلكتروني</label><input id="e">
+  <label>الموضوع</label><input id="s">
+  <label>الرسالة</label><textarea id="m" rows="5"></textarea>
+  <div class="row" style="margin-top:10px"><button class="btn btn-prim" onclick="send()">إرسال</button></div>
 </div>
-</section></main>
+</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
 <script>
-function send(){
-  fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    sender_name: name.value.trim(),
-    sender_email: email.value.trim(),
-    type: type.value.trim(),
-    subject: subject.value.trim(),
-    body: body.value.trim()
-  })}).then(r=>r.json()).then(d=>{
-    out.textContent = d.ok ? 'تم الإرسال، شكرًا لتواصلك.' : 'تعذر الإرسال';
-  }).catch(()=> out.textContent='تعذر الاتصال');
-}
+function send(){fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.value,email:e.value,subject:s.value,message:m.value})}).then(()=>alert('تم الإرسال'));}
 </script></body></html>
