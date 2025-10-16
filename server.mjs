@@ -53,6 +53,23 @@ async function init(){
     created_at TIMESTAMPTZ DEFAULT now()
   );`);
 
+  
+  // ensure link_id column exists and filled from qjson->>'id'
+  await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS link_id TEXT");
+  await pool.query("UPDATE quizzes SET link_id = COALESCE(link_id, (qjson->>'id')) WHERE link_id IS NULL");
+  // add uniqueness if missing
+  await pool.query(`DO $$
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='quizzes' AND indexname='quizzes_link_id_key') THEN
+      BEGIN
+        CREATE UNIQUE INDEX quizzes_link_id_key ON quizzes(link_id);
+      EXCEPTION WHEN others THEN
+        -- ignore if duplicate values exist; keep going
+        NULL;
+      END;
+    END IF;
+  END $$;`);
+
   // bootstrap admin if not exists
   const admin = await pool.query("SELECT id FROM teachers WHERE username=$1",["Admin"]);
   if(admin.rowCount===0){
