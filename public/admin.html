@@ -1,7 +1,5 @@
-<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>منصة إنشاء الاختبارات</title><link rel="stylesheet" href="./style.css"></head>
-<body><header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>منصة إنشاء الاختبارات</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav">
     <a class="navlink" href="./home.html">الرئيسية</a>
@@ -13,7 +11,7 @@
 </header>
 <main class="wrapper"><section class="hero-card">
 <h1>منصة إنشاء الاختبارات (داخلية)</h1>
-<label>عنوان الاختبار</label><input id="title" placeholder="مثال: اختبار القانون الدستوري – كويز 1">
+<label>عنوان الاختبار</label><input id="title" placeholder="مثال: اختبار القانون – كويز 1">
 <label>الزمن لكل سؤال (ثوان)</label><input id="perq" value="30">
 <div class="row"><label><input type="checkbox" id="once"> محاولة واحدة فقط للطالب</label></div>
 <div id="qbox"></div>
@@ -29,29 +27,26 @@ let qs=[];
 const H=()=>({Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'});
 function addTF(){qs.push({type:'tf',text:'',answer:true}); render();}
 function addMC(){qs.push({type:'mc',text:'',options:['','','',''],answer:0}); render();}
-function render(){qbox.innerHTML = qs.map((q,i)=> q.type==='tf' ? `
- <div class='form-card'><b>س${i+1} (صح/خطأ)</b>
- <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
- <select onchange='qs[${i}].answer=this.value==="true"'>
-   <option value="true" ${q.answer?'selected':''}>صح</option>
-   <option value="false" ${!q.answer?'selected':''}>خطأ</option>
- </select>
- <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button>
- </div>` : `
- <div class='form-card'><b>س${i+1} (متعدد)</b>
- <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
- ${q.options.map((o,j)=>`<div class='row'><input class='grow' value='${o}' oninput='qs[${i}].options[${j}]=this.value'><label><input type="radio" name="a${i}" ${q.answer===j?'checked':''} onclick='qs[${i}].answer=${j}'> إجابة صحيحة</label></div>`).join('')}
- <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button>
- </div>`).join('');}
 function delQ(i){qs.splice(i,1); render();}
+function render(){qbox.innerHTML = qs.map((q,i)=> q.type==='tf' ?
+ `<div class='form-card'><b>س${i+1} (صح/خطأ)</b>
+  <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+  <select onchange='qs[${i}].answer=this.value==="true"'>
+    <option value="true" ${q.answer?'selected':''}>صح</option>
+    <option value="false" ${!q.answer?'selected':''}>خطأ</option>
+  </select>
+  <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>` :
+ `<div class='form-card'><b>س${i+1} (متعدد)</b>
+  <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+  ${q.options.map((o,j)=>`<div class='row'><input class='grow' value='${o}' oninput='qs[${i}].options[${j}]=this.value'><label><input type="radio" name="a${i}" ${q.answer===j?'checked':''} onclick='qs[${i}].answer=${j}'> إجابة صحيحة</label></div>`).join('')}
+  <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>`).join('');}
 function save(){
  const body={ title:title.value.trim(), per_question_seconds:+perq.value||30, only_one_attempt: once.checked, questions: qs };
  fetch('/api/quiz',{method:'POST',headers:H(),body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
   if(!d.ok){ out.textContent='تأكد من إدخال العنوان والأسئلة'; return; }
   const link = location.origin + '/student.html?id=' + d.link_id;
-  out.innerHTML = `تم الإنشاء. رابط الطالب: <a href="${link}" target="_blank">${link}</a> <button class='btn' onclick='copy("${link}")'>نسخ الرابط</button>`;
+  out.innerHTML = 'تم الإنشاء. رابط الطالب: <a target="_blank" href="'+link+'">'+link+'</a> <button class="btn" onclick="navigator.clipboard.writeText(\''+link+'\');alert(\'تم النسخ\')">نسخ الرابط</button>';
  });
 }
-function copy(t){navigator.clipboard.writeText(t); alert('تم نسخ الرابط');}
 fetch('/api/auth/me',{headers:H()}).then(r=>r.json()).then(d=>{ if(!d.me) location.href='./login.html'; });
 </script></body></html>

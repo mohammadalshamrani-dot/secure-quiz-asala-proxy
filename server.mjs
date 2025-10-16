@@ -2,10 +2,10 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import { Pool } from "pg";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,11 +17,8 @@ app.use(express.json({ limit: "1mb" }));
 // ENV
 const DATABASE_URL = process.env.DATABASE_URL;
 const JWT_SECRET = process.env.JWT_SECRET || "SecureQuizAsala2025";
-const MAIL_USER = process.env.MAIL_USER || "";
-const MAIL_PASS = process.env.MAIL_PASS || "";
-const MAIL_FROM = process.env.MAIL_FROM || MAIL_USER || "no-reply@alasala.edu.sa";
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 async function init(){
   await pool.query(`CREATE TABLE IF NOT EXISTS teachers(
@@ -72,19 +69,15 @@ const auth = async (req,res,next)=>{
   const hdr = req.headers.authorization||"";
   const tok = hdr.startsWith("Bearer ")? hdr.slice(7): null;
   if(!tok) return res.status(401).json({error:"no token"});
-  try{
-    req.user = jwt.verify(tok, JWT_SECRET);
-    next();
-  }catch(e){ res.status(401).json({error:"bad token"}); }
+  try{ req.user = jwt.verify(tok, JWT_SECRET); next(); }
+  catch(e){ res.status(401).json({error:"bad token"}); }
 };
 const adminOnly = (req,res,next)=> req.user?.is_admin ? next() : res.status(403).json({error:"forbidden"});
 
 // health
 app.get("/api/health", async (req,res)=>{
-  try{
-    await pool.query("SELECT 1");
-    res.json({ ok:true, db:true, ts:new Date().toISOString() });
-  }catch(e){ res.json({ ok:true, db:false }); }
+  try{ await pool.query("SELECT 1"); res.json({ ok:true, db:true, ts:new Date().toISOString() }); }
+  catch(e){ res.json({ ok:true, db:false }); }
 });
 
 // Auth
@@ -158,7 +151,7 @@ app.post("/api/admin/inbox_delete", auth, adminOnly, async (req,res)=>{
 });
 
 // Quizzes
-function rid(){ return Math.random().toString(36).slice(2,10); }
+function rid(){ return crypto.randomBytes(6).toString('hex'); }
 
 app.post("/api/quiz", auth, async (req,res)=>{
   const { title, per_question_seconds, only_one_attempt, questions } = req.body||{};
@@ -198,5 +191,6 @@ app.get("/api/my_results", auth, async (req,res)=>{
 
 // Static site
 app.use(express.static(path.join(__dirname, "public")));
+app.get("/", (_req,res)=>res.sendFile(path.join(__dirname, "public", "index.html")));
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, ()=> console.log("Asala single server v5 on", PORT));
+app.listen(PORT, ()=> console.log("Asala v5.1 on", PORT));

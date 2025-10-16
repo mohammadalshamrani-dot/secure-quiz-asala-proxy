@@ -1,8 +1,6 @@
-<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>صفحة الطالب</title><link rel="stylesheet" href="./style.css"></head>
-<body>
-<header class="header">
+<body><header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav"><span class="sub">يرجى عدم مغادرة الصفحة أثناء الاختبار</span></nav>
 </header>
@@ -10,11 +8,7 @@
 <h1>الاختبار</h1>
 <div id="gate" class="form-card">
   <h3>تعليمات مهمة قبل البدء</h3>
-  <ul>
-    <li>يرجى عدم مغادرة الصفحة أثناء الاختبار.</li>
-    <li>لكل سؤال وقت محدد، انتقل للسؤال التالي قبل انتهاء الوقت.</li>
-    <li>الخروج من الصفحة سيُنهي الاختبار ويُعلِم المدرس بذلك.</li>
-  </ul>
+  <ul><li>يرجى عدم مغادرة الصفحة أثناء الاختبار.</li><li>لكل سؤال وقت محدد، انتقل للسؤال التالي قبل انتهاء الوقت.</li><li>الخروج من الصفحة سيُنهي الاختبار ويُعلِم المدرس بذلك.</li></ul>
   <label>اسم الطالب الثنائي</label><input id="sname" placeholder="الاسم الأول الاسم الثاني">
   <label>الرقم الجامعي</label><input id="sid" placeholder="مثال: 4412345">
   <label>اسم المقرر</label><input id="course" placeholder="اسم المقرر">
@@ -26,7 +20,7 @@
 <script>
 const url=new URL(location.href); const id=url.searchParams.get('id');
 let qz=null, idx=0, score=0, leftPage=false, timer=null, SINFO=null;
-fetch('/api/quiz/'+id).then(r=>r.json()).then(d=>{ if(d&&d.questions){qz=d;} else gate.innerHTML='رابط غير صالح'; });
+fetch('/api/quiz/'+id).then(r=>r.json()).then(d=>{ if(d&&d.questions){qz=d;} else gate.innerHTML='رابط غير صالح'; }).catch(()=>gate.innerHTML='تعذّر الاتصال بالخادم');
 window.addEventListener('blur',()=>{ leftPage=true; });
 function startExam(){ 
   const name=sname.value.trim(), sidv=sid.value.trim(), crs=course.value.trim(), inst=instructor.value.trim();
@@ -38,17 +32,14 @@ function startExam(){
   gate.style.display='none'; quizBox.style.display='block'; render();
 }
 function render(){ const q=qz.questions[idx]; if(!q) return finish(); clearInterval(timer);
-  let inner=`<div class='row'><div class='grow'><b>س${idx+1} / ${qz.questions.length}</b></div><div id='trem' class='sub'></div></div><div><b>${q.text}</b></div>`;
-  if(q.type==='tf'){ inner+=`<div class='row'><button class='btn' onclick='ans(true)'>صح</button><button class='btn' onclick='ans(false)'>خطأ</button></div>`; }
-  else{ inner+= q.options.map((o,j)=>`<div class='row'><button class='btn grow' onclick='ans(${j})'>${o}</button></div>`).join(''); }
+  let inner='<div class="row"><div class="grow"><b>س'+(idx+1)+' / '+qz.questions.length+'</b></div><div id="trem" class="sub"></div></div><div><b>'+q.text+'</b></div>';
+  if(q.type==='tf'){ inner+='<div class="row"><button class="btn" onclick="ans(true)">صح</button><button class="btn" onclick="ans(false)">خطأ</button></div>'; }
+  else { inner+= q.options.map((o,j)=>'<div class="row"><button class="btn grow" onclick="ans('+j+')">'+o+'</button></div>').join(''); }
   quizBox.innerHTML=inner;
-  let s=qz.per_question_seconds||30; const tick=()=>{ trem.textContent='الوقت: '+s+' ثانية'; if(--s<0) ans(null); }; tick(); timer=setInterval(tick,1000);
+  let s=qz.per_question_seconds||30; const tick=()=>{ document.getElementById('trem').textContent='الوقت: '+s+' ثانية'; if(--s<0) ans(null); }; tick(); timer=setInterval(tick,1000);
 }
-function ans(v){ clearInterval(timer); const q=qz.questions[idx];
-  const ok = (q.type==='tf'? v===q.answer : v===q.answer);
-  if(ok) score++; idx++; render();
-}
-function finish(){ quizBox.innerHTML=`<h3>انتهى الاختبار</h3><div class='sub'>نتيجتك: ${score} من ${qz.questions.length}. سيتم إرسال نتيجتك إلى المدرس.</div>`;
- fetch('/api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:qz.id,student_name:SINFO?.name,score,total:qz.questions.length,left_page:leftPage,meta:{sid:SINFO?.sid,course:SINFO?.course,instructor:SINFO?.instructor,ua:navigator.userAgent}})});
+function ans(v){ clearInterval(timer); const q=qz.questions[idx]; if(q.type==='tf'){ if(v===q.answer) score++; } else { if(v===q.answer) score++; } idx++; render(); }
+function finish(){ quizBox.innerHTML='<h3>انتهى الاختبار</h3><div class="sub">نتيجتك: '+score+' من '+qz.questions.length+'. سيتم إرسال نتيجتك إلى المدرس.</div>';
+ fetch('/api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:qz.id,student_name:SINFO?SINFO.name:null,score:score,total:qz.questions.length,left_page:leftPage,meta:{sid:SINFO?SINFO.sid:null,course:SINFO?SINFO.course:null,instructor:SINFO?SINFO.instructor:null,ua:navigator.userAgent}})}).catch(()=>{});
 }
 </script></body></html>

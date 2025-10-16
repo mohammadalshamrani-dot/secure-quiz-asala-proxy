@@ -1,7 +1,5 @@
-<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>دخول أعضاء هيئة التدريس</title><link rel="stylesheet" href="./style.css"></head>
-<body><header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دخول أعضاء هيئة التدريس</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav">
     <a class="navlink" href="./home.html">الرئيسية</a>
@@ -13,7 +11,7 @@
 </header>
 <main class="wrapper"><section class="hero-card">
 <h1>دخول أعضاء هيئة التدريس</h1>
-<div class="sub">للإدارة يرجى استخدام صفحة <a href="./admin-login.html">دخول الإدارة</a></div>
+<div class="sub">للإدارة يرجى استخدام <a href="./admin-login.html">دخول الإدارة</a></div>
 <div class="form-card">
   <label>اسم المستخدم</label><input id="u">
   <label>كلمة المرور</label><input id="p" type="password">
@@ -25,9 +23,12 @@
 </div>
 </section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
 <script>
-function login(){fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value.trim(),password:p.value})}).then(r=>r.json()).then(d=>{
- if(!d.ok){ alert(d.error==='not approved'?'حسابك بانتظار موافقة الإدارة':'بيانات غير صحيحة'); return; }
- if(d.teacher.is_admin){ alert('هذا المدخل خاص بأعضاء هيئة التدريس. استخدم صفحة الإدارة.'); return; }
- localStorage.setItem('token', d.token); location.href='./dashboard.html';
-});}
+function login(){
+ fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u.value.trim(),password:p.value})})
+ .then(r=>r.json()).then(d=>{
+  if(!d.ok){ alert(d.error==='not approved'?'حسابك بانتظار موافقة الإدارة':'بيانات غير صحيحة'); return; }
+  if(d.teacher.is_admin){ alert('هذا المدخل خاص بالمدرّسين. استخدم صفحة الإدارة.'); return; }
+  localStorage.setItem('token', d.token); location.href='./dashboard.html';
+ }).catch(()=>alert('تعذّر الاتصال بالخادم'));
+}
 </script></body></html>

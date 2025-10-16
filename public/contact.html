@@ -1,7 +1,5 @@
-<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head>
-<body><header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav">
     <a class="navlink" href="./home.html">الرئيسية</a>
@@ -11,16 +9,10 @@
     <a class="navlink" href="./admin-login.html">الإدارة</a>
   </nav>
 </header>
-<main class="wrapper"><section class="hero-card">
-<h1>تواصل مع الإدارة</h1>
+<main class="wrapper"><section class="hero-card"><h1>تواصل مع الإدارة</h1>
 <div class="form-card">
-  <label>الاسم</label><input id="n">
-  <label>البريد الإلكتروني</label><input id="e">
-  <label>الموضوع</label><input id="s">
-  <label>الرسالة</label><textarea id="m" rows="5"></textarea>
-  <div class="row" style="margin-top:10px"><button class="btn btn-prim" onclick="send()">إرسال</button></div>
-</div>
-</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+<label>الاسم</label><input id="n"><label>البريد</label><input id="e"><label>الموضوع</label><input id="s"><label>الرسالة</label><textarea id="m" rows="5"></textarea>
+<div class="row"><button class="btn btn-prim" onclick="send()">إرسال</button></div></div></section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
 <script>
-function send(){fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.value,email:e.value,subject:s.value,message:m.value})}).then(()=>alert('تم الإرسال'));}
+function send(){fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.value,email:e.value,subject:s.value,message:m.value})}).then(()=>alert('تم الإرسال')).catch(()=>alert('تعذّر الإرسال'));}
 </script></body></html>
