@@ -17,7 +17,7 @@ const API = {
 API.getQuizzes = async function(){
   try{
     const r = await fetch('/api/quizzes');
-    if(!r.ok) throw new Error();
+    if(!r.ok) throw new Error('status '+r.status);
     return await r.json();
   }catch(e){ return null; }
 };
@@ -25,7 +25,7 @@ API.getResults = async function(quizId){
   try{
     const url = '/api/results' + (quizId ? ('?quizId='+encodeURIComponent(quizId)) : '');
     const r = await fetch(url);
-    if(!r.ok) throw new Error();
+    if(!r.ok) throw new Error('status '+r.status);
     return await r.json();
   }catch(e){ return null; }
 };

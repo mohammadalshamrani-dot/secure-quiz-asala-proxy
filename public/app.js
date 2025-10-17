@@ -186,13 +186,6 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
       o.value = q.quizId; o.textContent = q.title + ' – ' + q.course;
       qsSel.appendChild(o);
     });
-  });
-    qsSel.innerHTML = '';
-    Object.values(quizzes).forEach(q=>{
-      const o = document.createElement('option');
-      o.value = q.quizId; o.textContent = q.title + ' – ' + q.course;
-      qsSel.appendChild(o);
-    });
   }
   populateQuizSelect();
 
@@ -263,24 +256,7 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
         w.print(); w.close();
       });
     });
-  });
-    const rows = (all[qid]||[]).sort((a,b)=>a.ts-b.ts);
-    const box = document.getElementById('resultsTable');
-    if(!rows.length){ box.innerHTML = '<p class="muted">لا توجد نتائج بعد.</p>'; return; }
-    let html = '<table><thead><tr><th>اسم المقرر</th><th>اسم المدرس</th><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
-    rows.forEach((r,i)=>{
-      const date = new Date(r.ts).toLocaleString('ar-SA');
-      html += `<tr><td>${r.course||''}</td><td>${r.teacher||''}</td><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
-      <td><button data-i="${i}" class="btn print-one">طباعة</button></td></tr>`;
-    });
-    html += '</tbody></table>';
-    box.innerHTML = html;
-    box.querySelectorAll('.print-one').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i = +btn.getAttribute('data-i');
-        const r = rows[i];
-        const w = window.open('','printwin');
-        w.document.write(`<pre style="font-family:ui-monospace">${JSON.stringify(r,null,2)}</pre>`);
+  }</pre>`);
         w.print(); w.close();
       });
     });
