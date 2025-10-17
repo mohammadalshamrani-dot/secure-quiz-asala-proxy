@@ -1,153 +1,33 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>لوحة الإدارة</title>
-  <link rel="stylesheet" href="/style.css" />
-  <style>
-    body{background:#f5f7fb}
-    .container{max-width:1100px;margin:24px auto;padding:12px}
-    .hero{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-    .h1{font-size:28px;font-weight:800}
-    .btn{border:none;border-radius:999px;padding:10px 18px;cursor:pointer}
-    .btn-primary{background:#b30000;color:#fff}
-    .btn-ghost{background:#fff;border:1px solid #ddd}
-    .grid{display:grid;grid-template-columns:1fr;gap:16px}
-    @media(min-width:900px){ .grid{grid-template-columns:1fr 1fr} }
-    .card{background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:18px}
-    .card h3{margin:0 0 12px;font-size:18px}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:8px;border-bottom:1px solid #eee;font-size:14px}
-    .muted{color:#777;font-size:13px}
-    .row{display:flex;gap:8px;align-items:center}
-    .input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;background:#f7f9fc}
-  </style>
+<meta charset="UTF-8">
+<title>لوحة الإدارة</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <div class="hero">
-      <div class="h1">لوحة الإدارة</div>
-      <div class="row">
-        <a class="btn btn-ghost" href="/index.html">الرئيسية</a>
-        <a class="btn btn-primary" href="/admin.html">منصة إنشاء الاختبارات (داخلية)</a>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3>طلبات تسجيل أعضاء هيئة التدريس (تحتاج موافقة)</h3>
-        <div class="muted">لا تظهر كلمات المرور.</div>
-        <table id="pendingTbl">
-          <thead><tr><th>الاسم</th><th>البريد</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="card">
-        <h3>الاختبارات المنشأة</h3>
-        <table id="quizzesTbl">
-          <thead><tr><th>العنوان</th><th>الزمن/س</th><th>محاولة واحدة</th><th>التاريخ</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <div class="muted">يعرض معلومات المقرر فقط – لا يوجد حذف أو استعراض نتائج الطلاب من هنا.</div>
-      </div>
-
-      <div class="card">
-        <h3>تغيير كلمة المرور لعضو هيئة التدريس</h3>
-        <div class="row" style="gap:10px">
-          <input id="rp_user" class="input" placeholder="اسم المستخدم"/>
-          <input id="rp_pass" class="input" placeholder="كلمة المرور الجديدة"/>
-          <button id="rp_btn" class="btn btn-primary">تغيير</button>
-        </div>
-        <div class="muted" style="margin-top:6px">لن يؤثر على المشرف.</div>
-      </div>
-
-      <div class="card">
-        <h3>روابط سريعة</h3>
-        <div class="row" style="gap:10px;flex-wrap:wrap">
-          <a class="btn btn-ghost" href="/dashboard.html">انتقال إلى ملف عضو هيئة التدريس</a>
-          <a class="btn btn-ghost" href="/admin.html">فتح صفحة إنشاء الاختبار</a>
-        </div>
-      </div>
-    </div>
-  </div>
-
+<div class="container">
+<h1>لوحة الإدارة</h1>
+<section><h2>طلبات التسجيل</h2><div id="pending"></div></section>
+<section><h2>الاختبارات المنشأة</h2><div id="quizzes"></div></section>
+</div>
 <script>
-  const token = localStorage.getItem('jwt') || '';
-  async function jget(url){
-    const r = await fetch(url, { headers: { Authorization: 'Bearer '+token } });
-    return r.json();
-  }
-  async function jpost(url, body){
-    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify(body||{}) });
-    return r.json();
-  }
-
-  async function guard(){
-    const me = await jget('/api/auth/me');
-    if(!me.me || !me.me.is_admin){
-      alert('هذه الصفحة للمشرف فقط'); location.href='/admin-login.html';
-      return false;
-    }
-    return true;
-  }
-
-  function fmt(d){ try{ return new Date(d).toLocaleString('ar-SA'); }catch{ return d||''; } }
-
-  async function loadPending(){
-    const data = await jget('/api/admin/pending');
-    const tb = document.querySelector('#pendingTbl tbody');
-    tb.innerHTML = '';
-    (data.rows||[]).forEach(row=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${row.username||''}</td>
-        <td>${row.email||''}</td>
-        <td>${fmt(row.created_at)}</td>
-        <td class="row">
-          <button class="btn btn-primary" data-act="approve" data-id="${row.id}">موافقة</button>
-          <button class="btn btn-ghost" data-act="reject" data-id="${row.id}">رفض</button>
-        </td>`;
-      tb.appendChild(tr);
-    });
-    tb.onclick = async (e)=>{
-      const btn = e.target.closest('button'); if(!btn) return;
-      const id = btn.getAttribute('data-id');
-      const approve = btn.getAttribute('data-act')==='approve';
-      await jpost(`/api/admin/teachers/${id}/approve`, { approve });
-      loadPending();
-    };
-  }
-
-  async function loadQuizzes(){
-    const data = await jget('/api/admin/quizzes');
-    const tb = document.querySelector('#quizzesTbl tbody');
-    tb.innerHTML = '';
-    (data.rows||[]).forEach(q=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${q.title||''}</td>
-        <td>${q.per_question_seconds||''}</td>
-        <td>${q.only_one_attempt ? 'نعم' : 'لا'}</td>
-        <td>${fmt(q.created_at)}</td>`;
-      tb.appendChild(tr);
-    });
-  }
-
-  document.getElementById('rp_btn').onclick = async ()=>{
-    const u = document.getElementById('rp_user').value.trim();
-    const p = document.getElementById('rp_pass').value.trim();
-    if(!u || !p){ alert('املأ الحقول'); return; }
-    const ok = await jpost('/api/admin/reset_password', { username:u, new_password:p });
-    if(ok.ok) alert('تم التغيير');
-    else alert('حدث خطأ');
-  };
-
-  (async()=>{
-    if(!(await guard())) return;
-    await Promise.all([loadPending(), loadQuizzes()]);
-  })();
+async function loadPending(){
+ const r=await fetch('/api/admin/pending');
+ const d=await r.json();
+ document.getElementById('pending').innerHTML=d.map(t=>`<div>${t.username} (${t.email}) <button onclick="approve(${t.id},true)">قبول</button> <button onclick="approve(${t.id},false)">رفض</button></div>`).join('');
+}
+async function loadQuizzes(){
+ const r=await fetch('/api/admin/quizzes');
+ const d=await r.json();
+ document.getElementById('quizzes').innerHTML=d.map(q=>`<div><b>${q.title}</b> - ${q.username} (${q.created_at})</div>`).join('');
+}
+async function approve(id,approve){
+ await fetch('/api/admin/teachers/'+id+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approve})});
+ loadPending();
+}
+loadPending();
+loadQuizzes();
 </script>
 </body>
 </html>
