@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
@@ -21,14 +22,14 @@ if (DATABASE_URL) {
   });
 }
 
-// ===== Utilities: minimal JWT (no external deps) =====
-function base64url(input) {
+/* --------------------- Utilities: JWT بسيط --------------------- */
+function b64u(input) {
   return Buffer.from(input).toString('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
 }
 function sign(payload, secret) {
   const header = { alg: 'HS256', typ: 'JWT' };
-  const encHeader = base64url(JSON.stringify(header));
-  const encPayload = base64url(JSON.stringify(payload));
+  const encHeader = b64u(JSON.stringify(header));
+  const encPayload = b64u(JSON.stringify(payload));
   const data = encHeader + '.' + encPayload;
   const sig = crypto.createHmac('sha256', secret).update(data).digest('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
   return data + '.' + sig;
@@ -49,32 +50,27 @@ function authFrom(req) {
   try { return verify(m[1], JWT_SECRET); } catch(e){ return null; }
 }
 
-// ===== Health: لا يعتمد على قاعدة البيانات =====
-app.get('/api/health', (req,res)=> res.json({ok:true, ts:new Date().toISOString()}));
+/* --------------------- Health --------------------- */
+app.get('/api/health', (_req,res)=> res.json({ok:true, ts:new Date().toISOString()}));
 
-// ===== Schema bootstrap (idempotent + compatible) =====
+/* --------------------- Schema bootstrap --------------------- */
 async function ensureSchema() {
-  if (!pool) throw new Error('No database configured');
-  // teachers
+  if (!pool) return; // لا تكسر التشغيل لو مافيه قاعدة
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS teachers (
       id SERIAL PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL
+      email TEXT,
+      username TEXT UNIQUE NOT NULL,
+      -- دعم النسخ السابقة:
+      password TEXT,
+      pass_hash TEXT,
+      is_admin BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      is_approved BOOLEAN DEFAULT false
     );
   `);
-  await pool.query(`
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS email TEXT;
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password TEXT;
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS pass_hash TEXT;
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false;
-    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
-  `);
-  await pool.query(\`CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_username ON teachers (username);\`);
-  // backfill pass_hash from password if missing
-  await pool.query(\`UPDATE teachers SET pass_hash = COALESCE(pass_hash, password) WHERE pass_hash IS NULL;\`);
 
-  // quizzes
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quizzes (
       id SERIAL PRIMARY KEY,
@@ -86,9 +82,7 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
   `);
-  await pool.query(\`ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS link_id TEXT;\`);
 
-  // results
   await pool.query(`
     CREATE TABLE IF NOT EXISTS results (
       id SERIAL PRIMARY KEY,
@@ -102,35 +96,38 @@ async function ensureSchema() {
     );
   `);
 
-  // Bootstrap admin if missing (ensuring pass_hash set)
+  // فهارس آمنة
+  try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_username ON teachers (username)`); } catch {}
+  try { await pool.query(`CREATE INDEX IF NOT EXISTS idx_quizzes_link ON quizzes (link_id)`); } catch {}
+
+  // تأكيد وجود الأدمن
   const adminUser = 'Admin';
   const adminPass = 'AaBbCc123';
-  await pool.query(\`
-    INSERT INTO teachers(username,email,password,pass_hash,is_admin,is_approved)
-    VALUES ($1,$2,$3,$3,true,true)
-    ON CONFLICT (username) DO UPDATE
-      SET email=EXCLUDED.email,
-          password=EXCLUDED.password,
-          pass_hash=EXCLUDED.pass_hash,
-          is_admin=EXCLUDED.is_admin,
-          is_approved=EXCLUDED.is_approved;
-  \`,[adminUser,'admin@alasala.edu.sa',adminPass]);
+  const r = await pool.query("SELECT id FROM teachers WHERE username=$1 LIMIT 1",[adminUser]);
+  if (!r.rows.length) {
+    await pool.query(
+      "INSERT INTO teachers(email, username, password, pass_hash, is_admin, is_approved) VALUES ($1,$2,$3,$4,$5,$6)",
+      ['admin@alasala.edu.sa', adminUser, adminPass, adminPass, true, true]
+    );
+    console.log('Admin created');
+  } else {
+    // لو موجود تأكد من الموافقة
+    await pool.query("UPDATE teachers SET is_approved=true, is_admin=true WHERE username=$1",[adminUser]);
+  }
 }
 
-// ===== Auth endpoints =====
+/* --------------------- Auth --------------------- */
 app.post('/api/auth/login', async (req,res)=>{
   try{
-    if(!pool) throw new Error('Database not ready');
-    await ensureSchema();
     const {username, password} = req.body||{};
-    if(!username || !password) return res.status(400).json({ok:false});
-    const r = await pool.query("SELECT id, username, email, password, pass_hash, is_admin, is_approved FROM teachers WHERE lower(username)=lower($1) LIMIT 1",[username]);
-    if(!r.rows.length) return res.status(401).json({ok:false, error:'NO_USER'});
+    if (!pool) return res.status(500).json({ok:false, error:'DB_OFF'});
+    await ensureSchema();
+    const r = await pool.query("SELECT id, username, email, password, pass_hash, is_admin, is_approved FROM teachers WHERE lower(username)=lower($1) LIMIT 1", [username||'']);
+    if (!r.rows.length) return res.status(401).json({ok:false, error:'NO_USER'});
     const u = r.rows[0];
-    if(!u.is_approved) return res.status(403).json({ok:false, error:'NOT_APPROVED'});
-    // match against either plain password or pass_hash for backward compatibility
-    const stored = (u.pass_hash ?? u.password ?? '') + '';
-    if(stored !== (password+'')) return res.status(401).json({ok:false, error:'BAD_PASS'});
+    if (!u.is_approved) return res.status(403).json({ok:false, error:'NOT_APPROVED'});
+    const ok = (u.password && u.password === password) || (u.pass_hash && u.pass_hash === password);
+    if (!ok) return res.status(401).json({ok:false, error:'BAD_PASS'});
     const token = sign({uid:u.id, username:u.username, is_admin:u.is_admin}, JWT_SECRET);
     res.json({ok:true, token, me:{id:u.id, username:u.username, is_admin:u.is_admin}});
   }catch(e){ console.error('login-error', e); res.status(500).json({ok:false}); }
@@ -139,26 +136,23 @@ app.post('/api/auth/login', async (req,res)=>{
 app.get('/api/auth/me', async (req,res)=>{
   try{
     const a = authFrom(req);
-    if(!a) return res.json({me:null});
-    if(pool){
+    if (!a) return res.json({me:null});
+    if (pool) {
       await ensureSchema();
       const r = await pool.query("SELECT id, username, is_admin FROM teachers WHERE id=$1 LIMIT 1",[a.uid]);
-      if(r.rows.length){
-        const u=r.rows[0];
-        return res.json({me:{id:u.id, username:u.username, is_admin:u.is_admin}});
-      }
+      if (r.rows.length) return res.json({me:r.rows[0]});
     }
     res.json({me:{id:a.uid, username:a.username, is_admin:!!a.is_admin}});
-  }catch(e){ res.json({me:null}); }
+  }catch{ res.json({me:null}); }
 });
 
-// ===== Quiz creation / fetch / result =====
+/* --------------------- Quiz endpoints --------------------- */
 app.post('/api/quiz', async (req,res)=>{
   try{
-    if(!pool) throw new Error('Database not ready');
+    if (!pool) return res.status(500).json({ok:false, error:'DB_OFF'});
     await ensureSchema();
     const auth = authFrom(req);
-    if(!auth) return res.status(401).json({ok:false});
+    if (!auth) return res.status(401).json({ok:false});
     const { title, per_question_seconds, only_one_attempt, questions } = req.body||{};
     if(!title || !Array.isArray(questions) || !questions.length) return res.status(400).json({ok:false});
     const link_id = crypto.randomBytes(4).toString('hex');
@@ -171,7 +165,7 @@ app.post('/api/quiz', async (req,res)=>{
 
 app.get('/api/quiz/:id', async (req,res)=>{
   try{
-    if(!pool) throw new Error('Database not ready');
+    if (!pool) return res.status(500).json({ok:false, error:'DB_OFF'});
     await ensureSchema();
     const r = await pool.query("SELECT qjson FROM quizzes WHERE link_id=$1 LIMIT 1",[req.params.id]);
     if(!r.rows.length) return res.status(404).json({ok:false});
@@ -181,7 +175,7 @@ app.get('/api/quiz/:id', async (req,res)=>{
 
 app.post('/api/result', async (req,res)=>{
   try{
-    if(!pool) throw new Error('Database not ready');
+    if (!pool) return res.status(500).json({ok:false, error:'DB_OFF'});
     await ensureSchema();
     const { quiz_id, student_name, score, total, left_page, meta } = req.body||{};
     await pool.query("INSERT INTO results(quiz_id,student_name,score,total,left_page,meta) VALUES ($1,$2,$3,$4,$5,$6)",
@@ -190,20 +184,22 @@ app.post('/api/result', async (req,res)=>{
   }catch(e){ console.error('result-insert-error', e); res.status(500).json({ok:false}); }
 });
 
-// ===== Static + root =====
-app.use(express.static('public'));
-app.get('/', (req,res)=> res.sendFile(new URL('./public/index.html', import.meta.url).pathname));
+/* --------------------- Static --------------------- */
+import { fileURLToPath } from 'url';
+import path from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// ===== Auto-check Schema & Admin every 60 seconds =====
-setInterval(async () => {
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (_req,res)=> res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+/* --------------------- Boot (بدون await أعلى الملف) --------------------- */
+(async function boot(){
   try {
-    if (pool) {
-      await ensureSchema();
-      console.log("✅ Schema auto-synced at", new Date().toISOString());
-    }
-  } catch (err) {
-    console.error("⚠️ Auto-sync error:", err.message);
+    await ensureSchema();                 // بداية التشغيل
+    setInterval(()=>{ ensureSchema().catch(()=>{}); }, 60_000); // كل دقيقة
+  } catch (e) {
+    console.error('bootstrap-error', e);
   }
-}, 60000); // every 60s
-
-app.listen(PORT, ()=> console.log('Asala v5.1.7 listening on', PORT));
+  app.listen(PORT, ()=> console.log('Asala v5.1.8 listening on', PORT));
+})();
