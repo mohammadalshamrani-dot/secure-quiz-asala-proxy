@@ -171,8 +171,22 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   });
 
   const qsSel = document.getElementById('quizSelect');
-  function populateQuizSelect(){
-    const quizzes = read(DB.quizzes, {});
+  async function populateQuizSelect(){
+    let quizzes = read(DB.quizzes, {});
+    try{
+      const cloud = await API.getQuizzes();
+      if(cloud && typeof cloud==='object'){
+        Object.values(cloud).forEach(q=>{ if(q && q.quizId) quizzes[q.quizId]=q; });
+        write(DB.quizzes, quizzes);
+      }
+    }catch(e){}
+    qsSel.innerHTML = '';
+    Object.values(quizzes).forEach(q=>{
+      const o = document.createElement('option');
+      o.value = q.quizId; o.textContent = q.title + ' – ' + q.course;
+      qsSel.appendChild(o);
+    });
+  });
     qsSel.innerHTML = '';
     Object.values(quizzes).forEach(q=>{
       const o = document.createElement('option');
@@ -222,16 +236,41 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     });
     render();
   }
-  function render(){
+  async function render(){
     const qid = sel.value;
-    const all = read(DB.results, {});
+    let all = read(DB.results, {});
+    try{
+      const cloudRows = await API.getResults(qid);
+      if(Array.isArray(cloudRows)){ all[qid] = cloudRows; write(DB.results, all); }
+    }catch(e){}
     const rows = (all[qid]||[]).sort((a,b)=>a.ts-b.ts);
     const box = document.getElementById('resultsTable');
     if(!rows.length){ box.innerHTML = '<p class="muted">لا توجد نتائج بعد.</p>'; return; }
-    let html = '<table><thead><tr><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>اسم المقرر</th><th>اسم المدرس</th><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
     rows.forEach((r,i)=>{
       const date = new Date(r.ts).toLocaleString('ar-SA');
-      html += `<tr><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
+      html += `<tr><td>${r.course||''}</td><td>${r.teacher||''}</td><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
+      <td><button data-i="${i}" class="btn print-one">طباعة</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+    box.querySelectorAll('.print-one').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const i = +btn.getAttribute('data-i');
+        const r = rows[i];
+        const w = window.open('','printwin');
+        w.document.write(`<pre style="font-family:ui-monospace">${JSON.stringify(r,null,2)}</pre>`);
+        w.print(); w.close();
+      });
+    });
+  });
+    const rows = (all[qid]||[]).sort((a,b)=>a.ts-b.ts);
+    const box = document.getElementById('resultsTable');
+    if(!rows.length){ box.innerHTML = '<p class="muted">لا توجد نتائج بعد.</p>'; return; }
+    let html = '<table><thead><tr><th>اسم المقرر</th><th>اسم المدرس</th><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
+    rows.forEach((r,i)=>{
+      const date = new Date(r.ts).toLocaleString('ar-SA');
+      html += `<tr><td>${r.course||''}</td><td>${r.teacher||''}</td><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
       <td><button data-i="${i}" class="btn print-one">طباعة</button></td></tr>`;
     });
     html += '</tbody></table>';
@@ -247,6 +286,8 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     });
   }
   sel.addEventListener('change', render);
+  const refreshBtn = document.getElementById('refreshCloudBtn');
+  if(refreshBtn){ refreshBtn.addEventListener('click', ()=>render()); }
   const delBtn = document.getElementById('deleteQuizBtn');
   function deleteQuiz(){
     const qid = sel.value; if(!qid){ alert('اختر اختباراً'); return; }
