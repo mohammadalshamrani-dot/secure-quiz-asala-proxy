@@ -86,3 +86,10 @@ input,textarea,select{background:#fff;border:1px solid var(--border);color:var(-
   font-size: 14px;
   color: #555;
 }
+
+/* SPLASH FIX v2 */
+.splash { display:flex; justify-content:center; align-items:center; height:100vh; background:#fff; }
+.splash .splash-inner { display:flex; flex-direction:column; align-items:center; text-align:center; padding:28px 36px; border:1px solid #e6e3dd; border-radius:18px; box-shadow:0 6px 22px rgba(0,0,0,.06); }
+.splash .splash-logo { width:140px; max-width:40vw; height:auto; margin-bottom:8px; }
+.splash .splash-title { font-size:20px; font-weight:800; margin-bottom:4px; color:#1f2430; }
+.splash .splash-dev { font-size:14px; color:#5a6475; }
