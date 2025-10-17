@@ -1,61 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>دخول الإدارة</title>
-  <link rel="stylesheet" href="/style.css">
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Noto Sans",Tahoma,Arial}
-    .card{max-width:740px;margin:40px auto;background:#fff;border:1px solid #eee;border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.05);padding:22px 26px}
-    .title{font-size:28px;font-weight:800;margin:6px 0 18px}
-    .input{width:100%;height:44px;border:1px solid #e2e2e2;border-radius:10px;padding:0 12px;background:#fff;margin:10px 0}
-    .btn{height:44px;border:0;border-radius:999px;padding:0 18px;font-weight:700;cursor:pointer}
-    .btn-primary{background:#8b0016;color:#fff}
-    .row{display:flex;gap:10px;align-items:center}
-    .muted{color:#777;font-size:13px}
-  </style>
-</head>
-<body>
-  <header style="max-width:1040px;margin:10px auto 0;display:flex;align-items:center;gap:14px">
-    <img src="/assets/logo-alasala.png" alt="ALASALA" style="height:36px">
-    <div style="font-weight:800">منصة الاختبارات – كليات الأصالة</div>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>لوحة الإدارة – تسجيل الدخول</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="container">
+        <a href="index.html" class="brand">منصة – كليات الأصالة</a>
+        <ul class="nav">
+          <li><a href="index.html">الرئيسية</a></li>
+          <li><a href="login.html">دخول أعضاء هيئة التدريس</a></li>
+          <li><a class="active" href="admin-login.html">الإدارة</a></li>
+        </ul>
+      </nav>
+    </header>
 
-  <main class="card">
-    <div class="title">لوحة الإدارة</div>
-    <div class="muted" style="margin:-8px 0 14px">أدخل بيانات حساب الإدارة.</div>
-    <input id="u" class="input" placeholder="اسم المستخدم" autocomplete="username" autofocus>
-    <input id="p" class="input" placeholder="كلمة المرور" type="password" autocomplete="current-password">
-    <div class="row" style="justify-content:flex-start;margin-top:8px">
-      <button id="loginBtn" class="btn btn-primary">دخول الإدارة</button>
-    </div>
-    <div id="msg" class="muted" style="margin-top:10px"></div>
-  </main>
+    <main class="container">
+      <section class="card">
+        <h1 class="title mb-3">لوحة الإدارة</h1>
+        <div id="msg" class="alert alert-info" style="display:none"></div>
 
-<script>
-const api = (path, opt={}) =>
-  fetch(path, Object.assign({headers:{'Content-Type':'application/json'}}, opt)).then(r=>r.json());
+        <form id="form" class="stack gap-2" autocomplete="off">
+          <label>اسم المستخدم
+            <input id="username" type="text" placeholder="Admin" required />
+          </label>
+          <label>كلمة المرور
+            <input id="password" type="password" placeholder="••••••••" required />
+          </label>
+          <div class="row end">
+            <button type="submit" class="btn btn-primary">دخول الإدارة</button>
+          </div>
+        </form>
+      </section>
+    </main>
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const username = document.getElementById('u').value.trim();
-  const password = document.getElementById('p').value;
-  const msg = document.getElementById('msg');
-  msg.textContent = '...جاري التحقق';
-  try {
-    const res = await api('/api/auth/login', {method:'POST', body: JSON.stringify({username, password})});
-    if (res && res.ok && res.token) {
-      // حفظ الرمز
-      localStorage.setItem('asz_token', res.token);
-      // التوجيه إلى صفحة التحكم (dashboard)
-      window.location.href = '/dashboard.html';
-    } else {
-      msg.textContent = 'بيانات غير صحيحة أو لم يتم اعتماد الحساب.';
-    }
-  } catch (e) {
-    msg.textContent = 'تعذّر الاتصال بالخادم. حاول لاحقًا.';
-  }
-});
-</script>
-</body>
+    <footer class="site-footer">
+      <div class="container small">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</div>
+    </footer>
+
+    <script>
+      async function postJSON(url, data) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return {res, data: await res.json().catch(() => ({}))};
+      }
+
+      const form = document.getElementById('form');
+      const msg = document.getElementById('msg');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.style.display = 'none';
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        const {res, data} = await postJSON('/api/auth/login', { username, password });
+
+        if (!res.ok || !data.ok) {
+          msg.textContent = 'بيانات غير صحيحة';
+          msg.className = 'alert alert-danger';
+          msg.style.display = 'block';
+          return;
+        }
+
+        // خزن التوكن
+        localStorage.setItem('asz_token', data.token);
+
+        // توجيه ذكي: إن كان مشرف -> لوحة الإدارة، غير ذلك -> الملف الشخصي
+        if (data.me && data.me.is_admin) {
+          window.location.href = '/admin-dashboard.html';
+        } else {
+          window.location.href = '/dashboard.html';
+        }
+      });
+    </script>
+  </body>
 </html>
