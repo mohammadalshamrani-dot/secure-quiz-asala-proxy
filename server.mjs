@@ -52,20 +52,29 @@ function authFrom(req) {
 // ===== Health: لا يعتمد على قاعدة البيانات =====
 app.get('/api/health', (req,res)=> res.json({ok:true, ts:new Date().toISOString()}));
 
-// ===== Schema bootstrap (idempotent) =====
+// ===== Schema bootstrap (idempotent + compatible) =====
 async function ensureSchema() {
   if (!pool) throw new Error('No database configured');
+  // teachers
   await pool.query(`
     CREATE TABLE IF NOT EXISTS teachers (
       id SERIAL PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT,
-      password TEXT,
-      is_admin BOOLEAN DEFAULT false,
-      is_approved BOOLEAN DEFAULT false,
-      created_at TIMESTAMPTZ DEFAULT now()
+      username TEXT UNIQUE NOT NULL
     );
   `);
+  await pool.query(`
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS email TEXT;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS password TEXT;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS pass_hash TEXT;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false;
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+  `);
+  await pool.query(\`CREATE UNIQUE INDEX IF NOT EXISTS uq_teachers_username ON teachers (username);\`);
+  // backfill pass_hash from password if missing
+  await pool.query(\`UPDATE teachers SET pass_hash = COALESCE(pass_hash, password) WHERE pass_hash IS NULL;\`);
+
+  // quizzes
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quizzes (
       id SERIAL PRIMARY KEY,
@@ -77,6 +86,9 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
   `);
+  await pool.query(\`ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS link_id TEXT;\`);
+
+  // results
   await pool.query(`
     CREATE TABLE IF NOT EXISTS results (
       id SERIAL PRIMARY KEY,
@@ -89,15 +101,20 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
   `);
-  await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS link_id TEXT");
-  // Bootstrap admin if missing
+
+  // Bootstrap admin if missing (ensuring pass_hash set)
   const adminUser = 'Admin';
   const adminPass = 'AaBbCc123';
-  const r = await pool.query("SELECT id FROM teachers WHERE username=$1 LIMIT 1", [adminUser]);
-  if (!r.rows.length) {
-    await pool.query("INSERT INTO teachers(username,email,password,is_admin,is_approved) VALUES ($1,$2,$3,$4,$5)",
-      [adminUser, 'admin@alasala.edu.sa', adminPass, true, true]);
-  }
+  await pool.query(\`
+    INSERT INTO teachers(username,email,password,pass_hash,is_admin,is_approved)
+    VALUES ($1,$2,$3,$3,true,true)
+    ON CONFLICT (username) DO UPDATE
+      SET email=EXCLUDED.email,
+          password=EXCLUDED.password,
+          pass_hash=EXCLUDED.pass_hash,
+          is_admin=EXCLUDED.is_admin,
+          is_approved=EXCLUDED.is_approved;
+  \`,[adminUser,'admin@alasala.edu.sa',adminPass]);
 }
 
 // ===== Auth endpoints =====
@@ -107,12 +124,13 @@ app.post('/api/auth/login', async (req,res)=>{
     await ensureSchema();
     const {username, password} = req.body||{};
     if(!username || !password) return res.status(400).json({ok:false});
-    const r = await pool.query("SELECT id, username, email, password, is_admin, is_approved FROM teachers WHERE lower(username)=lower($1) LIMIT 1",[username]);
+    const r = await pool.query("SELECT id, username, email, password, pass_hash, is_admin, is_approved FROM teachers WHERE lower(username)=lower($1) LIMIT 1",[username]);
     if(!r.rows.length) return res.status(401).json({ok:false, error:'NO_USER'});
     const u = r.rows[0];
     if(!u.is_approved) return res.status(403).json({ok:false, error:'NOT_APPROVED'});
-    // Plain password match (لتوافق الإصدارات السابقة)
-    if((u.password||'') !== password) return res.status(401).json({ok:false, error:'BAD_PASS'});
+    // match against either plain password or pass_hash for backward compatibility
+    const stored = (u.pass_hash ?? u.password ?? '') + '';
+    if(stored !== (password+'')) return res.status(401).json({ok:false, error:'BAD_PASS'});
     const token = sign({uid:u.id, username:u.username, is_admin:u.is_admin}, JWT_SECRET);
     res.json({ok:true, token, me:{id:u.id, username:u.username, is_admin:u.is_admin}});
   }catch(e){ console.error('login-error', e); res.status(500).json({ok:false}); }
@@ -122,7 +140,6 @@ app.get('/api/auth/me', async (req,res)=>{
   try{
     const a = authFrom(req);
     if(!a) return res.json({me:null});
-    // optional refresh from DB
     if(pool){
       await ensureSchema();
       const r = await pool.query("SELECT id, username, is_admin FROM teachers WHERE id=$1 LIMIT 1",[a.uid]);
@@ -177,4 +194,16 @@ app.post('/api/result', async (req,res)=>{
 app.use(express.static('public'));
 app.get('/', (req,res)=> res.sendFile(new URL('./public/index.html', import.meta.url).pathname));
 
-app.listen(PORT, ()=> console.log('Asala v5.1.6 listening on', PORT));
+// ===== Auto-check Schema & Admin every 60 seconds =====
+setInterval(async () => {
+  try {
+    if (pool) {
+      await ensureSchema();
+      console.log("✅ Schema auto-synced at", new Date().toISOString());
+    }
+  } catch (err) {
+    console.error("⚠️ Auto-sync error:", err.message);
+  }
+}, 60000); // every 60s
+
+app.listen(PORT, ()=> console.log('Asala v5.1.7 listening on', PORT));
