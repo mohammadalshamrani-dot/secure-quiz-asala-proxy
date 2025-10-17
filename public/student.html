@@ -26,6 +26,16 @@
 <section class="card">
   <h2>اختبار الطالب</h2>
   <div id="studentInfo" class="muted"></div>
+  <section id="studentGate" class="card">
+    <h3>الرجاء إدخال بياناتك لبدء الاختبار</h3>
+    <label>الاسم الكامل
+      <input type="text" id="gateName" required>
+    </label>
+    <label>الرقم الجامعي
+      <input type="text" id="gateSid" required>
+    </label>
+    <button id="gateStart" class="btn primary">بدء الاختبار</button>
+  </section>
   <div id="quizBox" class="quiz-box hidden">
     <div id="qText" class="q-text"></div>
     <div id="choices"></div>
@@ -44,7 +54,7 @@
 </main>
 <footer class="site-footer">منصة الاختبارات القصيرة – كليات الأصالة | مطوّر: د. محمد الشمراني – 2025</footer>
 <div id="splash" class="splash hidden">
-  <div class="splash-inner">
+  <div class="splash-inner" data-splash-upgraded="1"><img class="splash-logo" src="assets/logo-alasala.png" alt="الشعار"><div class="splash-title">منصة الاختبارات القصيرة – كليات الأصالة</div><div class="splash-dev">مطوّر: د. محمد الشمراني</div>
     <img src="assets/logo-alasala.png" alt="الشعار">
     <div>جاري التحميل...</div>
   </div>

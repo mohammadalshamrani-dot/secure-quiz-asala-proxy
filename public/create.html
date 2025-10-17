@@ -36,7 +36,8 @@
       <input type="number" id="perQuestion" min="5" value="30" required>
     </label>
     <div id="questions"></div>
-    <button id="addQ" class="btn" type="button">+ إضافة سؤال</button>
+    <button id="addQ" class="btn" type="button">+ إضافة سؤال اختيار من متعدد</button>
+    <button id="addQTF" class="btn" type="button">+ إضافة سؤال صح/خطأ</button>
     <button class="btn primary" type="submit">حفظ الاختبار</button>
   </form>
 </section>
@@ -47,13 +48,7 @@
     <label>اختر الاختبار
       <select id="quizSelect"></select>
     </label>
-    <label>اسم الطالب
-      <input type="text" id="stName" placeholder="مثال: أحمد علي" required>
-    </label>
-    <label>الرقم الجامعي
-      <input type="text" id="stId" placeholder="مثال: 4412345" required>
-    </label>
-    <button id="makeLink" class="btn">توليد الرابط</button>
+    <button id="makeLink" class="btn">توليد رابط الاختبار</button>
     <input id="genLink" class="mono" readonly>
     <button id="copyLink" class="btn">نسخ</button>
   </div>
@@ -63,7 +58,7 @@
 </main>
 <footer class="site-footer">منصة الاختبارات القصيرة – كليات الأصالة | مطوّر: د. محمد الشمراني – 2025</footer>
 <div id="splash" class="splash hidden">
-  <div class="splash-inner">
+  <div class="splash-inner" data-splash-upgraded="1"><img class="splash-logo" src="assets/logo-alasala.png" alt="الشعار"><div class="splash-title">منصة الاختبارات القصيرة – كليات الأصالة</div><div class="splash-dev">مطوّر: د. محمد الشمراني</div>
     <img src="assets/logo-alasala.png" alt="الشعار">
     <div>جاري التحميل...</div>
   </div>

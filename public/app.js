@@ -105,28 +105,40 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   if(!form) return;
   const questionsDiv = document.getElementById('questions');
   const addBtn = document.getElementById('addQ');
-  function addQuestion(){
+  function addQuestion(type='mcq'){
     const idx = questionsDiv.children.length + 1;
     const wrap = document.createElement('div');
     wrap.className = 'card';
-    wrap.innerHTML = `
-      <label>سؤال ${idx}
-        <input type="text" class="q-text" required>
+    wrap.dataset.type = type;
+    if(type==='tf'){
+      wrap.innerHTML = `
+      <label>سؤال ${idx} (صح/خطأ)
+        <input type=\"text\" class=\"q-text\" placeholder=\"اكتب عبارة الحكم\" required>
       </label>
-      <div class="grid-3">
-        <input type="text" class="opt" placeholder="اختيار 1" required>
-        <input type="text" class="opt" placeholder="اختيار 2" required>
-        <input type="text" class="opt" placeholder="اختيار 3" required>
-        <input type="text" class="opt" placeholder="اختيار 4" required>
+      <label>الإجابة الصحيحة
+        <select class=\"ans-tf\"><option value=\"0\">صح</option><option value=\"1\">خطأ</option></select>
+      </label>`;
+    } else {
+      wrap.innerHTML = `
+      <label>سؤال ${idx}
+        <input type=\"text\" class=\"q-text\" required>
+      </label>
+      <div class=\"grid-3\">
+        <input type=\"text\" class=\"opt\" placeholder=\"اختيار 1\" required>
+        <input type=\"text\" class=\"opt\" placeholder=\"اختيار 2\" required>
+        <input type=\"text\" class=\"opt\" placeholder=\"اختيار 3\" required>
+        <input type=\"text\" class=\"opt\" placeholder=\"اختيار 4\" required>
       </div>
       <label>رقم الإجابة الصحيحة (1-4)
-        <input type="number" class="ans" min="1" max="4" required>
-      </label>
-    `;
+        <input type=\"number\" class=\"ans\" min=\"1\" max=\"4\" required>
+      </label>`;
+    }
     questionsDiv.appendChild(wrap);
   }
-  addBtn.addEventListener('click', addQuestion);
-  addQuestion();
+  addBtn.addEventListener('click', ()=>addQuestion('mcq'));
+  const addBtnTF = document.getElementById('addQTF');
+  if(addBtnTF){ addBtnTF.addEventListener('click', ()=>addQuestion('tf')); }
+  addQuestion('mcq');
 
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -136,10 +148,17 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
     const course = document.getElementById('course').value.trim();
     const qs = [];
     [...questionsDiv.children].forEach(card=>{
+      const type = card.dataset.type || 'mcq';
       const text = card.querySelector('.q-text').value.trim();
-      const opts = [...card.querySelectorAll('.opt')].map(o=>o.value.trim());
-      const ans = parseInt(card.querySelector('.ans').value,10)-1;
-      qs.push({text,opts,ans});
+      if(type==='tf'){
+        const ans = parseInt(card.querySelector('.ans-tf').value,10);
+        const opts = ['صح','خطأ'];
+        qs.push({type, text, opts, ans});
+      } else {
+        const opts = [...card.querySelectorAll('.opt')].map(o=>o.value.trim());
+        const ans = parseInt(card.querySelector('.ans').value,10)-1;
+        qs.push({type, text, opts, ans});
+      }
     });
     const quizzes = read(DB.quizzes, {});
     quizzes[quizId] = {quizId, title, course, perQ, qs, ts: Date.now()};
@@ -306,21 +325,49 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   const params = new URLSearchParams(location.search);
   const id = params.get('id'); const name = params.get('name'); const sid = params.get('sid');
   const info = document.getElementById('studentInfo');
-  if(!id || !name || !sid){
-    info.textContent = 'لا يمكن بدء الاختبار بدون الاسم والرقم الجامعي.';
-    return;
-  }
-  info.textContent = 'الطالب: ' + decodeURIComponent(name) + ' – الرقم: ' + decodeURIComponent(sid);
+  if(!id){ info.textContent = 'لم يتم تحديد رقم الاختبار.'; return; }
 
   const quizzes = read(DB.quizzes, {});
   const quiz = quizzes[id];
-  if(!quiz){ box.classList.add('hidden'); info.textContent += ' | لم يتم العثور على الاختبار.'; return; }
+  if(!quiz){ box.classList.add('hidden'); info.textContent = 'لم يتم العثور على الاختبار.'; return; }
 
-  // randomize choices per student
-  const qs = quiz.qs.map(q=>{
-    const indices = [0,1,2,3].sort(()=>Math.random()-0.5);
-    const opts = indices.map(i=>q.opts[i]);
-    const ans = indices.indexOf(q.ans);
+  
+  let studentName = params.get('name');
+  let studentSid = params.get('sid');
+  const gate = document.getElementById('studentGate');
+  const gateStart = document.getElementById('gateStart');
+  const gateName = document.getElementById('gateName');
+  const gateSid  = document.getElementById('gateSid');
+
+  function openGate(msg){
+    if(gate){ gate.classList.remove('hidden'); }
+    info.textContent = msg || 'الرجاء إدخال البيانات لبدء الاختبار';
+  }
+
+  if(!studentName || !studentSid){
+    openGate();
+    gateStart.addEventListener('click', ()=>{
+      studentName = gateName.value.trim();
+      studentSid = gateSid.value.trim();
+      if(!studentName || !studentSid){ alert('أدخل الاسم والرقم الجامعي'); return; }
+      if(gate){ gate.classList.add('hidden'); }
+      info.textContent = 'الطالب: ' + studentName + ' – الرقم: ' + studentSid;
+      renderQ();
+    });
+  } else {
+    info.textContent = 'الطالب: ' + decodeURIComponent(studentName) + ' – الرقم: ' + decodeURIComponent(studentSid);
+    renderQ();
+  }
+
+  // randomize question order + choices per student
+  function shuffle(arr){ return arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]); }
+  const order = shuffle(quiz.qs.map((_,i)=>i));
+  const qs = order.map(idx=>{
+    const q = quiz.qs[idx];
+    const indices = q.opts.map((_,i)=>i);
+    const sh = shuffle(indices);
+    const opts = sh.map(i=>q.opts[i]);
+    const ans = sh.indexOf(q.ans);
     return {text:q.text, opts, ans};
   });
 
@@ -367,12 +414,11 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
     const total = qs.length;
     document.getElementById('score').textContent = correct + '/' + total;
     const all = read(DB.results, {}); all[quiz.quizId] = all[quiz.quizId]||[];
-    const rec = { quizId: quiz.quizId, name: decodeURIComponent(name), sid: decodeURIComponent(sid),
+    const rec = { quizId: quiz.quizId, name: studentName, sid: studentSid,
       score: correct, total, ts: Date.now(), note: left? 'خرج من المنصة' : '' };
     all[quiz.quizId].push(rec); write(DB.results, all);
     // best-effort server send
     try{ API.saveResult(rec); }catch{}
   }
 
-  renderQ();
 })();

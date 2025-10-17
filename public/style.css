@@ -21,3 +21,34 @@ label{display:block;margin:10px 0}input,textarea,select{width:100%;padding:10px;
 .hidden{display:none}
 .tabs{display:flex;gap:8px;margin-bottom:10px}.tab{padding:8px 12px;border:1px solid #1e2a48;border-radius:10px;background:#0d1324;color:#fff;cursor:pointer}.tab.active{background:#1a2b52}
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #1e2a48;padding:8px;text-align:center}
+
+
+/* Light theme palette aligned with ALASALA */
+:root{
+  --bg:#ffffff;
+  --bg-soft:#f7f6f5;
+  --text:#1f2430;
+  --muted:#5a6475;
+  --brand:#B10E2E; /* maroon */
+  --accent:#C6A66B; /* gold */
+  --border:#e6e3dd;
+  --card:#ffffff;
+}
+html,body{background:var(--bg);color:var(--text)}
+.site-header{background:var(--bg-soft);border-bottom:1px solid var(--border)}
+.site-footer{background:var(--bg-soft);border-top:1px solid var(--border);color:var(--muted)}
+a{color:var(--brand)}
+.btn{background:#faf9f7;border-color:var(--border);color:var(--text)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.card{background:var(--card);border:1px solid var(--border)}
+.feature-card{background:#faf9f7;border:1px solid var(--border)}
+input,textarea,select{background:#fff;border:1px solid var(--border);color:var(--text)}
+.tab{background:#faf9f7;border:1px solid var(--border);color:var(--text)}
+.tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.splash{background:var(--bg)}
+.splash-inner{background:#fff;padding:24px 28px;border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.splash-logo{width:96px;height:auto;margin-bottom:8px}
+.splash-title{font-weight:800;margin-bottom:4px}
+.splash-dev{color:var(--muted);font-size:14px}
+.brand img{border-radius:0}
+.brand .title{color:var(--text)}
