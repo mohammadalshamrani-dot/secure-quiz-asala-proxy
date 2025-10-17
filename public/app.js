@@ -190,6 +190,7 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     const base = window.location.origin + window.location.pathname.replace(/[^/]+$/, '');
     const urlObj = new URL('student.html', base);
     urlObj.searchParams.set('id', id);
+    urlObj.searchParams.set('exp', String(Date.now() + 10*60*1000));
     const url = urlObj.toString();
     const out = document.getElementById('genLink');
     if(out){ out.value = url; }
@@ -246,6 +247,15 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     });
   }
   sel.addEventListener('change', render);
+  const delBtn = document.getElementById('deleteQuizBtn');
+  function deleteQuiz(){
+    const qid = sel.value; if(!qid){ alert('اختر اختباراً'); return; }
+    if(!confirm('هل تريد حذف هذا الاختبار وجميع نتائجه؟')) return;
+    const quizzes = read(DB.quizzes, {}); delete quizzes[qid]; write(DB.quizzes, quizzes);
+    const all = read(DB.results, {}); delete all[qid]; write(DB.results, all);
+    populate(); alert('تم الحذف');
+  }
+  if(delBtn){ delBtn.addEventListener('click', deleteQuiz); }
   populate();
 })();
 
@@ -334,6 +344,11 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
   if(!box) return;
   const params = new URLSearchParams(location.search);
   const id = params.get('id'); const name = params.get('name'); const sid = params.get('sid');
+  const exp = Number(params.get('exp')||0);
+  if(exp && Date.now() > exp){
+    const info = document.getElementById('studentInfo'); if(info){ info.textContent = 'انتهت صلاحية الرابط. يرجى طلب رابط جديد من المدرس.'; }
+    return;
+  }
   const info = document.getElementById('studentInfo');
   if(!id){ info.textContent = 'لم يتم تحديد رقم الاختبار.'; return; }
 
@@ -348,6 +363,8 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
   const gateStart = document.getElementById('gateStart');
   const gateName = document.getElementById('gateName');
   const gateSid  = document.getElementById('gateSid');
+  const gateCourse = document.getElementById('gateCourse');
+  const gateTeacher = document.getElementById('gateTeacher');
 
   function openGate(msg){
     if(gate){ gate.classList.remove('hidden'); }
@@ -359,7 +376,7 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     gateStart.addEventListener('click', ()=>{
       studentName = gateName.value.trim();
       studentSid = gateSid.value.trim();
-      if(!studentName || !studentSid){ alert('أدخل الاسم والرقم الجامعي'); return; }
+      if(!studentName || !studentSid || !gateCourse.value.trim() || !gateTeacher.value.trim()){ alert('أدخل جميع الحقول: المقرر، المدرس، الاسم، الرقم الجامعي'); return; }
       if(gate){ gate.classList.add('hidden'); }
       info.textContent = 'الطالب: ' + studentName + ' – الرقم: ' + studentSid;
       renderQ();
@@ -423,8 +440,9 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     document.getElementById('resultBox').classList.remove('hidden');
     const total = qs.length;
     document.getElementById('score').textContent = correct + '/' + total;
+    const exitEl = document.getElementById('exitBtn'); if(exitEl){ exitEl.addEventListener('click', ()=>{ window.location.href='index.html'; }); }
     const all = read(DB.results, {}); all[quiz.quizId] = all[quiz.quizId]||[];
-    const rec = { quizId: quiz.quizId, name: studentName, sid: studentSid,
+    const rec = { quizId: quiz.quizId, course: gateCourse? gateCourse.value.trim(): (params.get('course')||''), teacher: gateTeacher? gateTeacher.value.trim():(params.get('teacher')||''), name: studentName, sid: studentSid,
       score: correct, total, ts: Date.now(), note: left? 'خرج من المنصة' : '' };
     all[quiz.quizId].push(rec); write(DB.results, all);
     // best-effort server send

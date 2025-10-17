@@ -27,7 +27,19 @@
   <h2>اختبار الطالب</h2>
   <div id="studentInfo" class="muted"></div>
   <section id="studentGate" class="card">
+    <h3>تعليمات البدء</h3>
+    <ul>
+      <li>أدخل بياناتك بدقة ولن يبدأ المؤقّت إلا بعد الضغط على بدء الاختبار.</li>
+      <li>عدم مغادرة الصفحة أثناء الحل؛ سيتم تسجيل الخروج إذا حدث قبل نهاية الاختبار.</li>
+      <li>أدخل اسم المقرر واسم المدرس.</li>
+    </ul>
     <h3>الرجاء إدخال بياناتك لبدء الاختبار</h3>
+    <label>اسم المقرر
+      <input type="text" id="gateCourse" required>
+    </label>
+    <label>اسم المدرس
+      <input type="text" id="gateTeacher" required>
+    </label>
     <label>الاسم الكامل
       <input type="text" id="gateName" required>
     </label>
@@ -47,7 +59,7 @@
   <div id="resultBox" class="hidden">
     <h3>نتيجتك:</h3>
     <p><strong>درجة الاختبار:</strong> <span id="score"></span></p>
-    <p class="muted">ملاحظة: يرجى أخذ لقطة للشاشة وإرسالها لمدرّس المقرر قبل إغلاق النافذة.</p>
+    <p class="muted">ملاحظة: سيتم إرسال نتيجتك إلى المدرّس تلقائيًا.</p>
   </div>
 </section>
 
