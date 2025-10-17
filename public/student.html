@@ -1,61 +1,53 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>صفحة الطالب</title><link rel="stylesheet" href="./style.css"></head>
-<body><header class="header">
-  <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
-  <nav class="nav"><span class="sub">يرجى عدم مغادرة الصفحة أثناء الاختبار</span></nav>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>منصة الاختبارات – كليات الأصالة</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script defer src="app.js"></script>
+  <script defer src="api.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">
+    <img src="assets/logo-alasala.png" alt="شعار كليات الأصالة">
+    <div class="title">كليات الأصالة – كلية القانون</div>
+  </div>
+  <nav>
+    <a href="index.html" class="nav-home">الرئيسية</a>
+    <a href="instructions.html">تعليمات سريعة</a>
+    <a href="contact.html">تواصل مع الإدارة</a>
+    <a href="admin-login.html">إدارة</a>
+  </nav>
 </header>
-<main class="wrapper"><section class="hero-card">
-<h1>الاختبار</h1>
-<div id="gate" class="form-card">
-  <h3>تعليمات مهمة قبل البدء</h3>
-  <ul><li>يرجى عدم مغادرة الصفحة أثناء الاختبار.</li><li>لكل سؤال وقت محدد، انتقل للسؤال التالي قبل انتهاء الوقت.</li><li>الخروج من الصفحة سيُنهي الاختبار ويُعلِم المدرس بذلك.</li></ul>
-  <label>اسم الطالب الثنائي</label><input id="sname" placeholder="الاسم الأول الاسم الثاني">
-  <label>الرقم الجامعي</label><input id="sid" placeholder="مثال: 4412345">
-  <label>اسم المقرر</label><input id="course" placeholder="اسم المقرر">
-  <label>اسم مدرس المقرر</label><input id="instructor" placeholder="اسم المدرس">
-  <div class="row" style="margin-top:10px"><button class="btn btn-prim" onclick="startExam()">بدء الاختبار</button></div>
+<main class="container">
+
+<section class="card">
+  <h2>اختبار الطالب</h2>
+  <div id="studentInfo" class="muted"></div>
+  <div id="quizBox" class="quiz-box hidden">
+    <div id="qText" class="q-text"></div>
+    <div id="choices"></div>
+    <div class="q-controls">
+      <span id="timer" class="mono"></span>
+      <button id="nextBtn" class="btn">التالي</button>
+    </div>
+  </div>
+  <div id="resultBox" class="hidden">
+    <h3>نتيجتك:</h3>
+    <p><strong>درجة الاختبار:</strong> <span id="score"></span></p>
+    <p class="muted">ملاحظة: يرجى أخذ لقطة للشاشة وإرسالها لمدرّس المقرر قبل إغلاق النافذة.</p>
+  </div>
+</section>
+
+</main>
+<footer class="site-footer">منصة الاختبارات القصيرة – كليات الأصالة | مطوّر: د. محمد الشمراني – 2025</footer>
+<div id="splash" class="splash hidden">
+  <div class="splash-inner">
+    <img src="assets/logo-alasala.png" alt="الشعار">
+    <div>جاري التحميل...</div>
+  </div>
 </div>
-<div id="quizBox" class="form-card" style="display:none"></div>
-</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
-<script>
-const url=new URL(location.href); const id=url.searchParams.get('id');
-let qz=null, idx=0, score=0, leftPage=false, timer=null, SINFO=null;
-fetch('/api/quiz/'+id).then(r=>r.json()).then(d=>{ if(d&&d.questions){qz=d;} else gate.innerHTML='رابط غير صالح'; }).catch(()=>gate.innerHTML='تعذّر الاتصال بالخادم');
-window.addEventListener('blur',()=>{ leftPage=true; });
-function startExam(){ 
-  const name=sname.value.trim(), sidv=sid.value.trim(), crs=course.value.trim(), inst=instructor.value.trim();
-  if(!name.split(/\s+/).filter(Boolean)[1]){ alert('أدخل الاسم الثنائي'); return; }
-  if(!/^\d{5,}$/.test(sidv)){ alert('أدخل رقمًا جامعيًا صحيحًا'); return; }
-  if(!crs || !inst){ alert('أدخل اسم المقرر واسم المدرس'); return; }
-  if(!qz){ alert('الأسئلة غير جاهزة بعد'); return; }
-  SINFO={name, sid:sidv, course:crs, instructor:inst};
-  gate.style.display='none'; quizBox.style.display='block'; render();
-}
-function render(){ const q=qz.questions[idx]; if(!q) return finish(); clearInterval(timer);
-  let inner='<div class="row"><div class="grow"><b>س'+(idx+1)+' / '+qz.questions.length+'</b></div><div id="trem" class="sub"></div></div><div><b>'+q.text+'</b></div>';
-  if(q.type==='tf'){ inner+='<div class="row"><button class="btn" onclick="ans(true)">صح</button><button class="btn" onclick="ans(false)">خطأ</button></div>'; }
-  else { inner+= q.options.map((o,j)=>'<div class="row"><button class="btn grow" onclick="ans('+j+')">'+o+'</button></div>').join(''); }
-  quizBox.innerHTML=inner;
-  let s=qz.per_question_seconds||30; const tick=()=>{ document.getElementById('trem').textContent='الوقت: '+s+' ثانية'; if(--s<0) ans(null); }; tick(); timer=setInterval(tick,1000);
-}
-function ans(v){ clearInterval(timer); const q=qz.questions[idx]; if(q.type==='tf'){ if(v===q.answer) score++; } else { if(v===q.answer) score++; } idx++; render(); }
-function finish(){ quizBox.innerHTML='<h3>انتهى الاختبار</h3><div class="sub">نتيجتك: '+score+' من '+qz.questions.length+'. سيتم إرسال نتيجتك إلى المدرس.</div>';
- fetch('/api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:qz.id,student_name:SINFO?SINFO.name:null,score:score,total:qz.questions.length,left_page:leftPage,meta:{sid:SINFO?SINFO.sid:null,course:SINFO?SINFO.course:null,instructor:SINFO?SINFO.instructor:null,ua:navigator.userAgent}})}).catch(()=>{});
-}
-</script>
-<script>
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
-    }catch(e){ /* try again */ }
-    await new Promise(res=>setTimeout(res, 1200));
-  }
-  return false;
-}
-</script>
-</body></html>
+</body>
+</html>

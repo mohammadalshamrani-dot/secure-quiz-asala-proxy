@@ -1,34 +1,52 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تواصل مع الإدارة</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
-  <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
-  <nav class="nav">
-    <a class="navlink" href="./home.html">الرئيسية</a>
-    <a class="navlink" href="./instructions.html">تعليمات سريعة</a>
-    <a class="navlink" href="./login.html">دخول أعضاء هيئة التدريس</a>
-    <a class="navlink" href="./contact.html">تواصل مع الإدارة</a>
-    <a class="navlink" href="./admin-login.html">الإدارة</a>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>منصة الاختبارات – كليات الأصالة</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script defer src="app.js"></script>
+  <script defer src="api.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">
+    <img src="assets/logo-alasala.png" alt="شعار كليات الأصالة">
+    <div class="title">كليات الأصالة – كلية القانون</div>
+  </div>
+  <nav>
+    <a href="index.html" class="nav-home">الرئيسية</a>
+    <a href="instructions.html">تعليمات سريعة</a>
+    <a href="contact.html">تواصل مع الإدارة</a>
+    <a href="admin-login.html">إدارة</a>
   </nav>
 </header>
-<main class="wrapper"><section class="hero-card"><h1>تواصل مع الإدارة</h1>
-<div class="form-card">
-<label>الاسم</label><input id="n"><label>البريد</label><input id="e"><label>الموضوع</label><input id="s"><label>الرسالة</label><textarea id="m" rows="5"></textarea>
-<div class="row"><button class="btn btn-prim" onclick="send()">إرسال</button></div></div></section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
-<script>
-function send(){fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.value,email:e.value,subject:s.value,message:m.value})}).then(()=>alert('تم الإرسال')).catch(()=>alert('تعذّر الإرسال'));}
-</script>
-<script>
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
-    }catch(e){ /* try again */ }
-    await new Promise(res=>setTimeout(res, 1200));
-  }
-  return false;
-}
-</script>
-</body></html>
+<main class="container">
+
+<section class="card narrow">
+  <h2>تواصل مع الإدارة</h2>
+  <form id="contactForm">
+    <label>الاسم
+      <input type="text" id="cName" required>
+    </label>
+    <label>البريد
+      <input type="email" id="cEmail" required>
+    </label>
+    <label>الرسالة
+      <textarea id="cMsg" rows="5" required></textarea>
+    </label>
+    <button class="btn primary" type="submit">إرسال</button>
+  </form>
+  <p class="muted">تصل الرسائل إلى لوحة الإدارة (الوارد).</p>
+</section>
+
+</main>
+<footer class="site-footer">منصة الاختبارات القصيرة – كليات الأصالة | مطوّر: د. محمد الشمراني – 2025</footer>
+<div id="splash" class="splash hidden">
+  <div class="splash-inner">
+    <img src="assets/logo-alasala.png" alt="الشعار">
+    <div>جاري التحميل...</div>
+  </div>
+</div>
+</body>
+</html>

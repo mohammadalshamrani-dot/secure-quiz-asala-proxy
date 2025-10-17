@@ -1,41 +1,52 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تسجيل عضو هيئة التدريس</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
-  <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
-  <nav class="nav">
-    <a class="navlink" href="./home.html">الرئيسية</a>
-    <a class="navlink" href="./instructions.html">تعليمات سريعة</a>
-    <a class="navlink" href="./login.html">دخول أعضاء هيئة التدريس</a>
-    <a class="navlink" href="./contact.html">تواصل مع الإدارة</a>
-    <a class="navlink" href="./admin-login.html">الإدارة</a>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>منصة الاختبارات – كليات الأصالة</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script defer src="app.js"></script>
+  <script defer src="api.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="brand">
+    <img src="assets/logo-alasala.png" alt="شعار كليات الأصالة">
+    <div class="title">كليات الأصالة – كلية القانون</div>
+  </div>
+  <nav>
+    <a href="index.html" class="nav-home">الرئيسية</a>
+    <a href="instructions.html">تعليمات سريعة</a>
+    <a href="contact.html">تواصل مع الإدارة</a>
+    <a href="admin-login.html">إدارة</a>
   </nav>
 </header>
-<main class="wrapper"><section class="hero-card"><h1>تسجيل جديد</h1>
-<div class="form-card">
-<label>البريد الجامعي</label><input id="email">
-<label>اسم المستخدم</label><input id="username">
-<label>كلمة المرور</label><input id="password" type="password">
-<div class="row"><button class="btn btn-prim" onclick="go()">تسجيل</button><a class="btn btn-ghost" href="./login.html">عودة</a></div>
-<div id="out" class="sub"></div></div></section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
-<script>
-function go(){
- const body={email:email.value.trim(),username:username.value.trim(),password:password.value};
- fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-  .then(r=>r.json()).then(d=>{out.textContent=d.ok?'تم إرسال طلبك للموافقة.':'تعذر التسجيل أو البيانات مستخدمة.';}).catch(()=>out.textContent='تعذّر الاتصال بالخادم');
-}
-</script>
-<script>
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
-    }catch(e){ /* try again */ }
-    await new Promise(res=>setTimeout(res, 1200));
-  }
-  return false;
-}
-</script>
-</body></html>
+<main class="container">
+
+<section class="card narrow">
+  <h2>تسجيل عضو جديد</h2>
+  <form id="signupForm">
+    <label>الاسم الكامل
+      <input type="text" id="suName" required>
+    </label>
+    <label>البريد الجامعي
+      <input type="email" id="suEmail" required>
+    </label>
+    <label>كلمة المرور
+      <input type="password" id="suPass" required>
+    </label>
+    <button class="btn primary" type="submit">إرسال طلب التسجيل</button>
+  </form>
+  <p class="muted">سيتم اعتماد حسابك من الإدارة قبل السماح بالدخول.</p>
+</section>
+
+</main>
+<footer class="site-footer">منصة الاختبارات القصيرة – كليات الأصالة | مطوّر: د. محمد الشمراني – 2025</footer>
+<div id="splash" class="splash hidden">
+  <div class="splash-inner">
+    <img src="assets/logo-alasala.png" alt="الشعار">
+    <div>جاري التحميل...</div>
+  </div>
+</div>
+</body>
+</html>
