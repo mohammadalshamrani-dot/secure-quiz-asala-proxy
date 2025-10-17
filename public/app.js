@@ -286,8 +286,6 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     });
   }
   sel.addEventListener('change', render);
-  const refreshBtn = document.getElementById('refreshCloudBtn');
-  if(refreshBtn){ refreshBtn.addEventListener('click', ()=>render()); }
   const delBtn = document.getElementById('deleteQuizBtn');
   function deleteQuiz(){
     const qid = sel.value; if(!qid){ alert('اختر اختباراً'); return; }
