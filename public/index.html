@@ -3,20 +3,4 @@
 <style>.splash{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}</style>
 <script>setTimeout(()=>location.href='./home.html',4000);</script></head><body>
 <div class="splash"><div class="brand"><img src="./assets/logo-alasala.png" class="logo"><h1 style="margin:0">منصة الاختبارات القصيرة</h1></div><div class="sub">كليات الأصالة – كلية القانون</div><div class="sub">تطوير: د. محمد الشمراني</div></div>
-
-<script>
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
-    }catch(e){}
-    await new Promise(res=>setTimeout(res, 1200));
-  }
-  return false;
-}
-</script>
 </body></html>

@@ -1,54 +1,55 @@
-<!doctype html><html lang="ar" dir="rtl"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>الملف الشخصي</title>
-<link rel="stylesheet" href="./style.css">
-</head><body>
-<header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الملف الشخصي</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav">
     <a class="navlink" href="./home.html">الرئيسية</a>
     <a class="navlink" href="./instructions.html">تعليمات سريعة</a>
+    <a class="navlink" href="./login.html">دخول أعضاء هيئة التدريس</a>
     <a class="navlink" href="./contact.html">تواصل مع الإدارة</a>
     <a class="navlink" href="./admin-login.html">الإدارة</a>
   </nav>
 </header>
-
-<main class="wrapper">
-  <section class="hero-card">
-    <h1>الملف الشخصي</h1>
-    <div class="row">
-      <!-- رابط مباشر + إيقاظ في الخلفية. الإبحار سيعمل حتى لو فشل السكربت -->
-      <a id="builderLink" class="btn btn-prim" href="./admin.html" target="_self" rel="noopener">منصة إنشاء الاختبارات</a>
-      <button id="btnResults" class="btn">عرض النتائج</button>
-    </div>
-    <div id="results" style="margin-top:12px"></div>
-  </section>
-</main>
-
-<footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
-
+<main class="wrapper"><section class="hero-card">
+<h1>الملف الشخصي</h1>
+<div class="row">
+  <a class="btn btn-prim" href="./admin.html">منصة إنشاء الاختبارات</a>
+  <button class="btn" onclick="loadResults()">عرض النتائج</button>
+  <button class="btn btn-ghost" onclick="logout()">تسجيل الخروج</button>
+</div>
+<div id="results" class="form-card"></div>
+<div id="inboxCard" class="form-card" style="display:none"><h3>الوارد (للإدارة)</h3><div id="inboxBox" class="sub">—</div></div>
+<div id="adminCard" class="form-card" style="display:none">
+  <h3>إدارة المستخدمين (للإدارة)</h3>
+  <h4>طلبات التسجيل المعلّقة</h4><div id="pendingBox" class="sub">—</div>
+  <h4 style="margin-top:12px">إعادة/تعيين كلمة مرور لعضو</h4>
+  <div class="row"><input id="rp_email" placeholder="البريد"><input id="rp_username" placeholder="اليوزر"><input id="rp_newpass" placeholder="كلمة جديدة"><button class="btn" onclick="resetTeacher()">حفظ</button></div>
+</div>
+</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
 <script>
-// إيقاظ الخادم في الخلفية فقط — لا نمنع الإبحار إطلاقًا
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{ const ac=new AbortController(); const to=setTimeout(()=>ac.abort(),3500);
-      const r=await fetch('/api/health',{signal:ac.signal}); clearTimeout(to);
-      if(r.ok) return true;
-    }catch(e){} await new Promise(r=>setTimeout(r,900));
-  } return false;
+const H=()=>({Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'});
+fetch('/api/auth/me',{headers:H()}).then(r=>r.json()).then(d=>{
+ if(!d.me){location.href='./login.html';return;} window.ME=d.me;
+ if(ME.is_admin){document.getElementById('inboxCard').style.display='block';document.getElementById('adminCard').style.display='block';loadInbox();loadPending();}
+});
+function loadResults(){
+ fetch('/api/my_results',{headers:H()}).then(r=>r.json()).then(d=>{
+  const items=d.items||[];
+  let rows=items.map((r,i)=>`<tr><td>${i+1}</td><td>${r.link_id}</td><td>${r.student_name||''}</td><td>${r.score}/${r.total}</td><td>${(r.meta||{}).sid||''}</td><td>${(r.meta||{}).course||''}</td><td>${(r.meta||{}).instructor||''}</td><td>${new Date(r.created_at).toLocaleString()}</td><td>${r.left_page?'خرج من الصفحة':''}</td></tr>`).join('');
+  document.getElementById('results').innerHTML = "<div style='display:flex;align-items:center;gap:10px'><img src='./assets/logo-alasala.png' style='height:42px'><div><h3 style='margin:0'>نتائج الاختبارات</h3><div class='sub'>منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</div></div></div><div class='row'><button class='btn' onclick='window.print()'>طباعة</button><button class='btn' onclick='dlCSV()'>CSV</button></div><table class='table'><thead><tr><th>#</th><th>معرّف</th><th>الطالب</th><th>الدرجة</th><th>الرقم</th><th>المقرر</th><th>المدرس</th><th>التاريخ</th><th>ملاحظة</th></tr></thead><tbody>"+rows+"</tbody></table>";
+ });
 }
-function H(){return {Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'};}
-
-// أوقظ الخادم بمجرد فتح الصفحة، لكن لا أغيّر سلوك الرابط إطلاقًا
-wakeServer(4);
-
-// النتائج (كما هي)
-async function loadResults(){
-  const r=await fetch('/api/my_results',{headers:H()});
-  const d=await r.json(); const items=d.items||[];
-  const rows=items.map((x,i)=>`<tr><td>${i+1}</td><td>${x.link_id||''}</td><td>${x.student_name||''}</td><td>${x.score}/${x.total}</td><td>${(x.meta||{}).sid||''}</td><td>${(x.meta||{}).course||''}</td><td>${(x.meta||{}).instructor||''}</td><td>${new Date(x.created_at).toLocaleString()}</td><td>${x.left_page?'خرج':''}</td></tr>`).join('');
-  results.innerHTML = `<table class='table'><thead><tr><th>#</th><th>معرّف</th><th>الطالب</th><th>الدرجة</th><th>الرقم الجامعي</th><th>المقرر</th><th>المدرس</th><th>التاريخ</th><th>ملاحظة</th></tr></thead><tbody>${rows}</tbody></table>`;
+function dlCSV(){
+ fetch('/api/my_results',{headers:H()}).then(r=>r.json()).then(d=>{
+  const L=['#,quiz_id,student_name,score,total,student_id,course,instructor,created_at,left_page'];
+  (d.items||[]).forEach((r,i)=>L.push([i+1,r.link_id,JSON.stringify(r.student_name||''),r.score,r.total,JSON.stringify((r.meta||{}).sid||''),JSON.stringify((r.meta||{}).course||''),JSON.stringify((r.meta||{}).instructor||''),r.created_at,r.left_page].join(',')));
+  const blob=new Blob([L.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='results.csv'; a.click();
+ });
 }
-btnResults.onclick=loadResults;
-</script>
-</body></html>
+function loadInbox(){fetch('/api/admin/inbox',{headers:H()}).then(r=>r.json()).then(d=>{const box=document.getElementById('inboxBox'); if(!d.ok){box.textContent='تعذر التحميل';return;} box.innerHTML=(d.items||[]).map(it=>`<div class='row'><div class='grow'><b>${it.subject||'-'}</b><div class='sub'>${it.name||''} — ${it.email||''} — ${new Date(it.created_at).toLocaleString()}</div><div>${(it.message||'').replace(/</g,'&lt;')}</div></div><button class='btn btn-ghost' onclick='delMsg(${it.id})'>حذف</button></div>`).join('');});}
+function delMsg(id){fetch('/api/admin/inbox_delete',{method:'POST',headers:H(),body:JSON.stringify({id})}).then(()=>loadInbox());}
+function loadPending(){fetch('/api/admin/pending_teachers',{headers:H()}).then(r=>r.json()).then(d=>{const box=document.getElementById('pendingBox'); if(!d.ok){box.textContent='تعذر التحميل';return;} if(!d.items.length){box.textContent='لا توجد طلبات.';return;} box.innerHTML=d.items.map(m=>`<div class='row' style='align-items:center'><div class='grow'><b>${m.username}</b> — ${m.email} <span class='sub'>(${new Date(m.created_at).toLocaleString()})</span></div><button class='btn btn-prim' onclick='approve(${m.id})'>موافقة</button><button class='btn btn-ghost' onclick='reject(${m.id})'>رفض</button></div>`).join('');});}
+function approve(id){fetch('/api/admin/approve_teacher',{method:'POST',headers:H(),body:JSON.stringify({id})}).then(()=>loadPending());}
+function reject(id){if(!confirm('تأكيد الرفض؟')) return; fetch('/api/admin/reject_teacher',{method:'POST',headers:H(),body:JSON.stringify({id})}).then(()=>loadPending());}
+function resetTeacher(){const email=rp_email.value.trim(), username=rp_username.value.trim(), new_password=rp_newpass.value; if(!email||!username||!new_password){alert('املأ البيانات');return;} fetch('/api/admin/reset_teacher',{method:'POST',headers:H(),body:JSON.stringify({email,username,new_password})}).then(r=>r.json()).then(d=>alert(d.ok?'تم التحديث':'تعذر التحديث'));}
+function logout(){localStorage.removeItem('token');location.href='./home.html';}
+</script></body></html>
