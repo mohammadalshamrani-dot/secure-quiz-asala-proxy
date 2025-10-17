@@ -1,1 +1,58 @@
-<سيتم وضع الكود المعدل لتوجيه صفحة تسجيل الدخول هنا>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لوحة الإدارة – تسجيل الدخول</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .container{max-width:920px;margin:32px auto;padding:16px}
+    .card{background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:24px}
+    .title{font-size:28px;margin-bottom:24px;font-weight:700}
+    .input{width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:10px;background:#f7f9fc}
+    .btn{border:none;border-radius:999px;padding:10px 18px;cursor:pointer}
+    .btn-primary{background:#b30000;color:#fff}
+    .row{display:flex;gap:12px;align-items:center}
+    .mt{margin-top:14px}
+    .hint{color:#888;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="title">لوحة الإدارة</div>
+      <div class="hint">للمشرف فقط</div>
+      <div class="mt">
+        <label>اسم المستخدم</label>
+        <input id="u" class="input" autocomplete="username" />
+      </div>
+      <div class="mt">
+        <label>كلمة المرور</label>
+        <input id="p" type="password" class="input" autocomplete="current-password" />
+      </div>
+      <div class="mt row" style="justify-content:flex-end">
+        <button id="loginBtn" class="btn btn-primary">دخول الإدارة</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  async function post(url, body){
+    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return r.json();
+  }
+  document.getElementById('loginBtn').onclick = async () => {
+    const username = document.getElementById('u').value.trim();
+    const password = document.getElementById('p').value;
+    if(!username || !password){ alert('الرجاء تعبئة الحقول'); return; }
+    try{
+      const data = await post('/api/auth/login',{username,password});
+      if(!data.ok){ alert('بيانات غير صحيحة'); return; }
+      if(!data.me?.is_admin){ alert('الحساب ليس مشرفاً'); return; }
+      localStorage.setItem('jwt', data.token);
+      location.href = '/admin-dashboard.html';
+    }catch(e){ alert('تعذّر الاتصال بالخادم'); }
+  };
+</script>
+</body>
+</html>
