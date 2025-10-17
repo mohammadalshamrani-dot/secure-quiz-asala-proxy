@@ -35,18 +35,19 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 
 // Seed admin account if missing
 (function seedAdmin(){
-  API.getAdmin().then(a=>{ const adm = a || read(DB.admin, { user: 'admin', pass: 'AaBbCc123' }); write(DB.admin, adm); });
+  const adm = read(DB.admin, { user: 'admin', pass: 'AaBbCc123' });
+  write(DB.admin, adm);
 })();
 
 // LOGIN (teachers)
 (function teacherLogin(){
   const form = document.getElementById('loginForm');
   if(!form) return;
-  form.addEventListener('submit', async (e)=>{
+  form.addEventListener('submit', (e)=>{
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim().toLowerCase();
     const pass = document.getElementById('loginPass').value;
-    const users = (await API.getUsers()) || read(DB.users, []);
+    const users = read(DB.users, []);
     const ok = users.find(u=>u.email===email && u.pass===pass && u.approved);
     if(ok){ sessionStorage.setItem('sq_session', email); location.href='dashboard.html'; }
     else alert('تعذر الدخول: تأكد من صحة البيانات واعتماد الحساب.');
@@ -57,17 +58,15 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 (function signup(){
   const form = document.getElementById('signupForm');
   if(!form) return;
-  form.addEventListener('submit', async (e)=>{
+  form.addEventListener('submit', (e)=>{
     e.preventDefault();
     const name = document.getElementById('suName').value.trim();
     const email = document.getElementById('suEmail').value.trim().toLowerCase();
     const pass = document.getElementById('suPass').value;
-    const pending = (await API.getPending()) || read(DB.pending, []);
+    const pending = read(DB.pending, []);
     if(pending.find(p=>p.email===email)){ alert('تم إرسال طلب مسبقاً.'); return; }
-    const rec={name,email,pass,ts:Date.now()};
-    pending.push(rec);
+    pending.push({name,email,pass,ts:Date.now()});
     write(DB.pending, pending);
-    try{ await API.addPending(rec);}catch(e){}
     alert('تم إرسال طلب التسجيل للإدارة. سيتم إشعارك بعد الاعتماد.');
     location.href='login.html';
   });
@@ -77,18 +76,16 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 (function contact(){
   const f = document.getElementById('contactForm');
   if(!f) return;
-  f.addEventListener('submit', async (e)=>{
+  f.addEventListener('submit', (e)=>{
     e.preventDefault();
-    const inbox = (await API.getInbox()) || read(DB.inbox, []);
-    const rec={
+    const inbox = read(DB.inbox, []);
+    inbox.push({
       name: document.getElementById('cName').value.trim(),
       email: document.getElementById('cEmail').value.trim(),
       msg: document.getElementById('cMsg').value.trim(),
       ts: Date.now()
-    };
-    inbox.push(rec);
+    });
     write(DB.inbox, inbox);
-    try{ await API.addInbox(rec);}catch(e){}
     alert('تم الإرسال، شكراً لك.');
     location.href='index.html';
   });
@@ -174,11 +171,8 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   });
 
   const qsSel = document.getElementById('quizSelect');
-  async function populateQuizSelect(){
-    let quizzes = read(DB.quizzes, {});
-    try{
-      const cloud = await API.getQuizzes(); if(cloud) { Object.assign(quizzes, cloud); write(DB.quizzes, quizzes); }
-    }catch(e){}
+  function populateQuizSelect(){
+    const quizzes = read(DB.quizzes, {});
     qsSel.innerHTML = '';
     Object.values(quizzes).forEach(q=>{
       const o = document.createElement('option');
@@ -228,17 +222,16 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     });
     render();
   }
-  async function render(){
+  function render(){
     const qid = sel.value;
-    let all = read(DB.results, {});
-    try{ const cloudRows = await API.getResults(qid); if(Array.isArray(cloudRows)){ all[qid]=cloudRows; write(DB.results, all);} }catch(e){}
+    const all = read(DB.results, {});
     const rows = (all[qid]||[]).sort((a,b)=>a.ts-b.ts);
     const box = document.getElementById('resultsTable');
     if(!rows.length){ box.innerHTML = '<p class="muted">لا توجد نتائج بعد.</p>'; return; }
-    let html = '<table><thead><tr><th>اسم المقرر</th><th>اسم المدرس</th><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>الوقت</th><th>ملاحظة</th><th>طباعة</th></tr></thead><tbody>';
     rows.forEach((r,i)=>{
       const date = new Date(r.ts).toLocaleString('ar-SA');
-      html += `<tr><td>${r.course||''}</td><td>${r.teacher||''}</td><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
+      html += `<tr><td>${r.name}</td><td>${r.sid}</td><td>${r.score}/${r.total}</td><td>${date}</td><td>${r.note||''}</td>
       <td><button data-i="${i}" class="btn print-one">طباعة</button></td></tr>`;
     });
     html += '</tbody></table>';
@@ -255,10 +248,9 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
   }
   sel.addEventListener('change', render);
   const delBtn = document.getElementById('deleteQuizBtn');
-  async function deleteQuiz(){
+  function deleteQuiz(){
     const qid = sel.value; if(!qid){ alert('اختر اختباراً'); return; }
     if(!confirm('هل تريد حذف هذا الاختبار وجميع نتائجه؟')) return;
-    try{ await API.deleteQuiz(qid);}catch(e){}
     const quizzes = read(DB.quizzes, {}); delete quizzes[qid]; write(DB.quizzes, quizzes);
     const all = read(DB.results, {}); delete all[qid]; write(DB.results, all);
     populate(); alert('تم الحذف');
@@ -271,7 +263,7 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
 (function admin(){
   const form = document.getElementById('adminLoginForm');
   if(form){
-    form.addEventListener('submit', async (e)=>{
+    form.addEventListener('submit', (e)=>{
       e.preventDefault();
       const u = document.getElementById('adminUser').value.trim();
       const p = document.getElementById('adminPass').value;
@@ -293,14 +285,14 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
     document.getElementById('tab-'+t.dataset.tab).classList.remove('hidden');
   }));
 
-  async function renderInbox(){
-    const list = (await API.getInbox()) || read(DB.inbox, []);
+  function renderInbox(){
+    const list = read(DB.inbox, []);
     const box = document.getElementById('inboxList');
     if(!list.length){ box.innerHTML = '<p class="muted">لا رسائل بعد.</p>'; return; }
     box.innerHTML = list.map(m=>`<div class="card"><div><strong>${m.name}</strong> – ${m.email}</div><div class="muted">${new Date(m.ts).toLocaleString('ar-SA')}</div><p>${m.msg}</p></div>`).join('');
   }
-  async function renderPending(){
-    const pend = (await API.getPending()) || read(DB.pending, []);
+  function renderPending(){
+    const pend = read(DB.pending, []);
     const box = document.getElementById('pendingList');
     if(!pend.length){ box.innerHTML = '<p class="muted">لا طلبات حالياً.</p>'; return; }
     box.innerHTML = pend.map((p,i)=>`
@@ -317,7 +309,7 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
       pend2.splice(i,1);
       write(DB.pending, pend2);
       if(act==='approve'){
-        const users = (await API.getUsers()) || read(DB.users, []);
+        const users = read(DB.users, []);
         users.push({name:rec.name,email:rec.email,pass:rec.pass,approved:true});
         write(DB.users, users);
       }
@@ -329,17 +321,17 @@ document.getElementById('makeLink').addEventListener('click', ()=>{
       e.preventDefault();
       const email = document.getElementById('pwMemberEmail').value.trim().toLowerCase();
       const newp = document.getElementById('pwMemberNew').value;
-      const users = (await API.getUsers()) || read(DB.users, []);
+      const users = read(DB.users, []);
       const u = users.find(x=>x.email===email);
       if(!u){ alert('لا يوجد عضو بهذا البريد'); return; }
       u.pass = newp; write(DB.users, users); alert('تم التحديث');
     });
-    document.getElementById('pwAdminForm').addEventListener('submit', async (e)=>{
+    document.getElementById('pwAdminForm').addEventListener('submit', (e)=>{
       e.preventDefault();
       const user = document.getElementById('pwAdminUser').value.trim();
       const newp = document.getElementById('pwAdminNew').value;
-      let adm = (await API.getAdmin()) || read(DB.admin, {user:'admin',pass:'AaBbCc123'});
-      adm.user = user; adm.pass = newp; write(DB.admin, adm); try{ await API.saveAdmin(adm);}catch(e){}
+      const adm = read(DB.admin, {user:'admin',pass:'AaBbCc123'});
+      adm.user = user; adm.pass = newp; write(DB.admin, adm);
       alert('تم تحديث كلمة مرور الأدمن');
     });
   }
