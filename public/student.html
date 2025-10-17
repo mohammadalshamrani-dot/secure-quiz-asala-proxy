@@ -1,6 +1,10 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>صفحة الطالب</title><link rel="stylesheet" href="./style.css"></head>
-<body><header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>صفحة الطالب</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav"><span class="sub">يرجى عدم مغادرة الصفحة أثناء الاختبار</span></nav>
 </header>
@@ -8,26 +12,46 @@
 <h1>الاختبار</h1>
 <div id="gate" class="form-card">
   <h3>تعليمات مهمة قبل البدء</h3>
-  <ul><li>يرجى عدم مغادرة الصفحة أثناء الاختبار.</li><li>لكل سؤال وقت محدد، انتقل للسؤال التالي قبل انتهاء الوقت.</li><li>الخروج من الصفحة سيُنهي الاختبار ويُعلِم المدرس بذلك.</li></ul>
+  <ul><li>يرجى عدم مغادرة الصفحة أثناء الاختبار.</li><li>لكل سؤال وقت محدد.</li><li>الخروج من الصفحة يُبلّغ المدرّس.</li></ul>
   <label>اسم الطالب الثنائي</label><input id="sname" placeholder="الاسم الأول الاسم الثاني">
   <label>الرقم الجامعي</label><input id="sid" placeholder="مثال: 4412345">
   <label>اسم المقرر</label><input id="course" placeholder="اسم المقرر">
   <label>اسم مدرس المقرر</label><input id="instructor" placeholder="اسم المدرس">
-  <div class="row" style="margin-top:10px"><button class="btn btn-prim" onclick="startExam()">بدء الاختبار</button></div>
+  <div class="row" style="margin-top:10px"><button class="btn btn-prim" id="btnStart">بدء الاختبار</button></div>
 </div>
 <div id="quizBox" class="form-card" style="display:none"></div>
-</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+</section></main>
+<footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+
 <script>
+async function wakeServer(retries=3){
+  for(let i=0;i<retries;i++){
+    try{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),3500);
+      const r=await fetch('/api/health',{signal:ctrl.signal}); clearTimeout(to);
+      if(r.ok) return true;
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,1000));
+  } return false;
+}
 const url=new URL(location.href); const id=url.searchParams.get('id');
 let qz=null, idx=0, score=0, leftPage=false, timer=null, SINFO=null;
-fetch('/api/quiz/'+id).then(r=>r.json()).then(d=>{ if(d&&d.questions){qz=d;} else gate.innerHTML='رابط غير صالح'; }).catch(()=>gate.innerHTML='تعذّر الاتصال بالخادم');
 window.addEventListener('blur',()=>{ leftPage=true; });
+
+async function loadQuiz(){
+  const ok=await wakeServer(4); if(!ok){ gate.innerHTML='الخادم غير متاح مؤقتًا. أعد المحاولة.'; return; }
+  try{
+    const r=await fetch('/api/quiz/'+id); if(!r.ok){ gate.innerHTML='رابط غير صالح.'; return; }
+    qz=await r.json(); if(!qz||!qz.questions){ gate.innerHTML='لم يتم العثور على الاختبار.'; }
+  }catch(e){ gate.innerHTML='تعذر الاتصال بالخادم.'; }
+}
+loadQuiz();
+
 function startExam(){ 
   const name=sname.value.trim(), sidv=sid.value.trim(), crs=course.value.trim(), inst=instructor.value.trim();
   if(!name.split(/\s+/).filter(Boolean)[1]){ alert('أدخل الاسم الثنائي'); return; }
   if(!/^\d{5,}$/.test(sidv)){ alert('أدخل رقمًا جامعيًا صحيحًا'); return; }
   if(!crs || !inst){ alert('أدخل اسم المقرر واسم المدرس'); return; }
-  if(!qz){ alert('الأسئلة غير جاهزة بعد'); return; }
+  if(!qz){ alert('الاختبار غير جاهز بعد'); return; }
   SINFO={name, sid:sidv, course:crs, instructor:inst};
   gate.style.display='none'; quizBox.style.display='block'; render();
 }
@@ -36,26 +60,12 @@ function render(){ const q=qz.questions[idx]; if(!q) return finish(); clearInter
   if(q.type==='tf'){ inner+='<div class="row"><button class="btn" onclick="ans(true)">صح</button><button class="btn" onclick="ans(false)">خطأ</button></div>'; }
   else { inner+= q.options.map((o,j)=>'<div class="row"><button class="btn grow" onclick="ans('+j+')">'+o+'</button></div>').join(''); }
   quizBox.innerHTML=inner;
-  let s=qz.per_question_seconds||30; const tick=()=>{ document.getElementById('trem').textContent='الوقت: '+s+' ثانية'; if(--s<0) ans(null); }; tick(); timer=setInterval(tick,1000);
+  let s=qz.per_question_seconds||30; const tick=()=>{ const t=document.getElementById('trem'); if(t) t.textContent='الوقت: '+s+' ثانية'; if(--s<0) ans(null); }; tick(); timer=setInterval(tick,1000);
 }
 function ans(v){ clearInterval(timer); const q=qz.questions[idx]; if(q.type==='tf'){ if(v===q.answer) score++; } else { if(v===q.answer) score++; } idx++; render(); }
 function finish(){ quizBox.innerHTML='<h3>انتهى الاختبار</h3><div class="sub">نتيجتك: '+score+' من '+qz.questions.length+'. سيتم إرسال نتيجتك إلى المدرس.</div>';
  fetch('/api/result',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:qz.id,student_name:SINFO?SINFO.name:null,score:score,total:qz.questions.length,left_page:leftPage,meta:{sid:SINFO?SINFO.sid:null,course:SINFO?SINFO.course:null,instructor:SINFO?SINFO.instructor:null,ua:navigator.userAgent}})}).catch(()=>{});
 }
-</script>
-<script>
-async function wakeServer(retries=3){
-  for(let i=0;i<retries;i++){
-    try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
-    }catch(e){}
-    await new Promise(res=>setTimeout(res, 1200));
-  }
-  return false;
-}
+btnStart.onclick=startExam;
 </script>
 </body></html>

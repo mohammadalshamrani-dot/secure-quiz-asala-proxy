@@ -1,5 +1,9 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>منصة إنشاء الاختبارات</title><link rel="stylesheet" href="./style.css"></head><body><header class="header">
+<!doctype html><html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>منصة إنشاء الاختبارات</title>
+<link rel="stylesheet" href="./style.css">
+</head><body>
+<header class="header">
   <div class="brand"><img class="logo" src="./assets/logo-alasala.png"><div class="title">كليات الأصالة – منصة الاختبارات</div></div>
   <nav class="nav">
     <a class="navlink" href="./home.html">الرئيسية</a>
@@ -9,60 +13,80 @@
     <a class="navlink" href="./admin-login.html">الإدارة</a>
   </nav>
 </header>
-<main class="wrapper"><section class="hero-card">
+<main class="wrapper">
+<section class="hero-card">
 <h1>منصة إنشاء الاختبارات (داخلية)</h1>
+<div class="note">في حال كانت الخدمة بطيئة، انتظر ثوانٍ ثم أعد المحاولة.</div>
 <label>عنوان الاختبار</label><input id="title" placeholder="مثال: اختبار القانون – كويز 1">
 <label>الزمن لكل سؤال (ثوان)</label><input id="perq" value="30">
 <div class="row"><label><input type="checkbox" id="once"> محاولة واحدة فقط للطالب</label></div>
 <div id="qbox"></div>
 <div class="row" style="margin-top:10px">
-  <button class="btn" onclick="addTF()">إضافة سؤال صح/خطأ</button>
-  <button class="btn" onclick="addMC()">إضافة سؤال من متعدد</button>
-  <button class="btn btn-prim" onclick="save()">حفظ وتوليد رابط للطلاب</button>
+  <button class="btn" id="btnTF">إضافة سؤال صح/خطأ</button>
+  <button class="btn" id="btnMC">إضافة سؤال من متعدد</button>
+  <button class="btn btn-prim" id="btnSave">حفظ وتوليد رابط للطلاب</button>
 </div>
 <div id="out" class="sub"></div>
-</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+</section>
+</main>
+<footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+
 <script>
-let qs=[];
-const H=()=>({Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'});
-function addTF(){qs.push({type:'tf',text:'',answer:true}); render();}
-function addMC(){qs.push({type:'mc',text:'',options:['','','',''],answer:0}); render();}
-function delQ(i){qs.splice(i,1); render();}
-function render(){qbox.innerHTML = qs.map((q,i)=> q.type==='tf' ?
- `<div class='form-card'><b>س${i+1} (صح/خطأ)</b>
-  <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
-  <select onchange='qs[${i}].answer=this.value==="true"'>
-    <option value="true" ${q.answer?'selected':''}>صح</option>
-    <option value="false" ${!q.answer?'selected':''}>خطأ</option>
-  </select>
-  <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>` :
- `<div class='form-card'><b>س${i+1} (متعدد)</b>
-  <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
-  ${q.options.map((o,j)=>`<div class='row'><input class='grow' value='${o}' oninput='qs[${i}].options[${j}]=this.value'><label><input type="radio" name="a${i}" ${q.answer===j?'checked':''} onclick='qs[${i}].answer=${j}'> إجابة صحيحة</label></div>`).join('')}
-  <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>`).join('');}
-function save(){
- const body={ title:title.value.trim(), per_question_seconds:+perq.value||30, only_one_attempt: once.checked, questions: qs };
- fetch('/api/quiz',{method:'POST',headers:H(),body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
-  if(!d.ok){ out.textContent='تأكد من إدخال العنوان والأسئلة'; return; }
-  const link = location.origin + '/student.html?id=' + d.link_id;
-  out.innerHTML = 'تم الإنشاء. رابط الطالب: <a target="_blank" href="'+link+'">'+link+'</a> <button class="btn" onclick="navigator.clipboard.writeText(\''+link+'\');alert(\'تم النسخ\')">نسخ الرابط</button>';
- });
-}
-wakeServer(4).then(()=>{ fetch('/api/auth/me',{headers:H()}).then(r=>r.json()).then(d=>{ if(!d.me) location.href='./login.html'; }); });
-</script>
-<script>
+// إيقاظ الخادم برفق قبل أي طلب ثقيل
 async function wakeServer(retries=3){
   for(let i=0;i<retries;i++){
     try{
-      const ac = new AbortController();
-      const t = setTimeout(()=>ac.abort(), 4000);
-      const r = await fetch('/api/health',{signal:ac.signal});
-      clearTimeout(t);
-      if(r.ok){ return true; }
+      const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),3500);
+      const r=await fetch('/api/health',{signal:ctrl.signal}); clearTimeout(to);
+      if(r.ok) return true;
     }catch(e){}
-    await new Promise(res=>setTimeout(res, 1200));
+    await new Promise(r=>setTimeout(r,1000));
   }
   return false;
 }
+function H(){return {Authorization:'Bearer '+localStorage.getItem('token'),'Content-Type':'application/json'};}
+
+let qs=[];
+function addTF(){qs.push({type:'tf',text:'',answer:true}); render();}
+function addMC(){qs.push({type:'mc',text:'',options:['','','',''],answer:0}); render();}
+function delQ(i){qs.splice(i,1); render();}
+function render(){
+  qbox.innerHTML = qs.map((q,i)=> q.type==='tf' ?
+   `<div class='form-card'><b>س${i+1} (صح/خطأ)</b>
+    <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+    <select onchange='qs[${i}].answer=this.value==="true"'>
+      <option value="true" ${q.answer?'selected':''}>صح</option>
+      <option value="false" ${!q.answer?'selected':''}>خطأ</option>
+    </select>
+    <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>` :
+   `<div class='form-card'><b>س${i+1} (متعدد)</b>
+    <input value='${q.text}' oninput='qs[${i}].text=this.value' placeholder='نص السؤال'>
+    ${q.options.map((o,j)=>`<div class='row'><input class='grow' value='${o}' oninput='qs[${i}].options[${j}]=this.value'><label><input type="radio" name="a${i}" ${q.answer===j?'checked':''} onclick='qs[${i}].answer=${j}'> إجابة صحيحة</label></div>`).join('')}
+    <button class='btn btn-ghost' onclick='delQ(${i})'>حذف</button></div>`).join('');
+}
+async function save(){
+  const ok=await wakeServer(4); if(!ok){ out.textContent='الخادم غير متاح مؤقتًا؛ حاول لاحقًا.'; return; }
+  const body={ title:title.value.trim(), per_question_seconds:+perq.value||30, only_one_attempt: once.checked, questions: qs };
+  if(!body.title || !qs.length){ out.textContent='أدخل العنوان وأضف أسئلة.'; return; }
+  try{
+    const r=await fetch('/api/quiz',{method:'POST',headers:H(),body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!d.ok){ out.textContent='تعذّر الحفظ، تحقق من البيانات.'; return; }
+    const link = location.origin + '/student.html?id=' + d.link_id;
+    out.innerHTML = 'تم الإنشاء. رابط الطالب: <a target="_blank" href="'+link+'">'+link+'</a> <button class="btn" onclick="navigator.clipboard.writeText(\''+link+'\');alert(\'تم النسخ\')">نسخ الرابط</button>';
+  }catch(e){ out.textContent='تعذر الاتصال بالخادم.'; }
+}
+
+// حماية الصفحة: نتحقق من هوية المستخدم بعد إيقاظ الخادم
+(async function init(){
+  if(!localStorage.getItem('token')){ location.href='./login.html'; return; }
+  await wakeServer(4);
+  try{
+    const r=await fetch('/api/auth/me',{headers:H()}); const d=await r.json();
+    if(!d.me){ location.href='./login.html'; return; }
+  }catch(e){ /* تجاهل */ }
+})();
+
+btnTF.onclick=addTF; btnMC.onclick=addMC; btnSave.onclick=save;
 </script>
 </body></html>
