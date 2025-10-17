@@ -18,4 +18,20 @@
     <a class="btn" href="./contact.html">تواصل مع الإدارة</a>
   </div>
   <div class="note">روابط الاختبار تُولَّد من لوحة الإنشاء ويستلم المدرس النتائج تلقائيًا.</div>
-</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer></body></html>
+</section></main><footer class="footer">منصة الاختبارات القصيرة – كليات الأصالة | تطوير: د. محمد الشمراني</footer>
+<script>
+async function wakeServer(retries=3){
+  for(let i=0;i<retries;i++){
+    try{
+      const ac = new AbortController();
+      const t = setTimeout(()=>ac.abort(), 4000);
+      const r = await fetch('/api/health',{signal:ac.signal});
+      clearTimeout(t);
+      if(r.ok){ return true; }
+    }catch(e){ /* try again */ }
+    await new Promise(res=>setTimeout(res, 1200));
+  }
+  return false;
+}
+</script>
+</body></html>
