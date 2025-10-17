@@ -182,14 +182,24 @@ function write(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
   }
   populateQuizSelect();
 
-  document.getElementById('makeLink').addEventListener('click', ()=>{
-    const id = qsSel.value;
-    const name = encodeURIComponent(document.getElementById('stName').value.trim());
-    const sid = encodeURIComponent(document.getElementById('stId').value.trim());
-    if(!id || !name || !sid){ alert('يرجى تعبئة الطالب والرقم الجامعي.'); return; }
-    const url = `${location.origin}${location.pathname.replace(/\/[^/]*$/, '/') }student.html?id=${id}&name=${name}&sid=${sid}`;
-    document.getElementById('genLink').value = url;
-  });
+  
+document.getElementById('makeLink').addEventListener('click', ()=>{
+  try{
+    const id = document.getElementById('quizSelect').value;
+    if(!id){ alert('يرجى اختيار الاختبار.'); return; }
+    const base = window.location.origin + window.location.pathname.replace(/[^/]+$/, '');
+    const urlObj = new URL('student.html', base);
+    urlObj.searchParams.set('id', id);
+    const url = urlObj.toString();
+    const out = document.getElementById('genLink');
+    if(out){ out.value = url; }
+    alert('تم توليد الرابط بنجاح');
+    console.log('Generated link:', url);
+  }catch(e){
+    alert('تعذر توليد الرابط'); console.error(e);
+  }
+});
+
   document.getElementById('copyLink').addEventListener('click', async ()=>{
     const v = document.getElementById('genLink').value;
     if(!v) return;

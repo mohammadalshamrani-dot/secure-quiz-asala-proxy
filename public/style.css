@@ -93,3 +93,6 @@ input,textarea,select{background:#fff;border:1px solid var(--border);color:var(-
 .splash .splash-logo { width:140px; max-width:40vw; height:auto; margin-bottom:8px; }
 .splash .splash-title { font-size:20px; font-weight:800; margin-bottom:4px; color:#1f2430; }
 .splash .splash-dev { font-size:14px; color:#5a6475; }
+
+/* SPLASH HARD CAP */
+#splash img{max-width:160px !important; height:auto !important; display:block; margin:0 auto 8px;}
