@@ -1,9 +1,5 @@
-/* app.js – Student Page Compatibility (Supabase + Render) */
+/* app.js v4 – robust enable for "بدء الاختبار" button and quiz fetch */
 (function () {
-  const notFoundEl = document.querySelector('#not-found, .not-found') || document.querySelector('.no-quiz');
-  const startBtn   = document.querySelector('#startBtn, .start-btn, button[type="submit"]');
-  const formEl     = document.querySelector('form');
-
   function normId(v){
     if(!v) return v;
     let s = String(v).trim();
@@ -37,24 +33,77 @@
     return null;
   }
 
+  function findStartButton() {
+    // Try common ids/classes
+    let btn = document.querySelector('#startBtn, .start-btn, button[type="submit"], input[type="submit"]');
+    if (btn) return btn;
+
+    // Fallback: look for any button with Arabic text like "بدء الاختبار" / "ابدأ الاختبار"
+    const candidates = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
+    const re = /(بدء|ابدا|ابدأ)\s*الاختبار/;
+    btn = candidates.find(el => {
+      const txt = (el.innerText || el.value || '').trim();
+      return re.test(txt);
+    });
+    return btn || null;
+  }
+
+  function enableButton(btn){
+    if (!btn) return;
+    try {
+      btn.disabled = false;
+      btn.removeAttribute('disabled');
+      btn.classList.remove('disabled');
+      btn.style.pointerEvents = 'auto';
+      btn.type = btn.tagName.toLowerCase() === 'input' ? 'submit' : (btn.type || 'submit');
+    } catch(_) {}
+  }
+
+  function showNotFound(show=true){
+    const el = document.querySelector('#not-found, .not-found, .no-quiz');
+    if (el) el.style.display = show ? 'block' : 'none';
+  }
+
   async function init() {
     const id = getId();
+    const startBtn = findStartButton();
+
     if (!id) {
-      notFoundEl && (notFoundEl.style.display = 'block');
-      startBtn && (startBtn.disabled = true);
+      showNotFound(true);
+      enableButton(startBtn); // allow manual continue if desired
       return;
     }
 
     const quiz = await fetchQuiz(id);
     if (!quiz || !quiz.qs || !quiz.qs.length) {
-      notFoundEl && (notFoundEl.style.display = 'block');
-      startBtn && (startBtn.disabled = true);
+      showNotFound(true);
       return;
     }
 
-    try { localStorage.setItem('quiz', JSON.stringify(quiz)); } catch(_) {}
-    notFoundEl && (notFoundEl.style.display = 'none');
-    startBtn && (startBtn.disabled = false);
+    // stash quiz for later pages if needed
+    try { localStorage.setItem('quiz', JSON.stringify(quiz)); } catch(_){}
+
+    // ready to start
+    showNotFound(false);
+    enableButton(startBtn);
+
+    // ensure the form exists and will submit
+    const form = startBtn ? startBtn.closest('form') : document.querySelector('form');
+    if (form) {
+      // inject hidden quizId for backend if useful
+      if (!form.querySelector('input[name="quizId"]')) {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'quizId';
+        hidden.value = quiz.id || id;
+        form.appendChild(hidden);
+      }
+    } else if (startBtn) {
+      // fallback: navigate to questions page if your flow uses a page like questions.html
+      startBtn.addEventListener('click', function(e){
+        // If the app expects navigation, place it here. For now just no-op to allow default.
+      });
+    }
   }
 
   document.readyState === 'loading'
