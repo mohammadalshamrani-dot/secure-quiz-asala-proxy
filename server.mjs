@@ -1,6 +1,3 @@
-// Secure Quiz Asala – server.mjs (Render Postgres storage)
-// Drop-in replacement preserving existing endpoints and frontend behaviour.
-
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -11,27 +8,20 @@ const { Pool } = pkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ----- Config -----
 const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.warn('[WARN] Missing DATABASE_URL. Set it in Render → Environment.');
-}
-const pool = DATABASE_URL ? new Pool({
+const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Render Postgres requires SSL
-}) : null;
+  ssl: { rejectUnauthorized: false },
+});
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ----- Health -----
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// ----- Bootstrap tables (optional safe) -----
 async function ensureTables() {
-  if (!pool) return;
   await pool.query(`
     create table if not exists public.quizzes (
       id text primary key,
@@ -49,33 +39,46 @@ async function ensureTables() {
     create index if not exists idx_results_quiz on public.results(quiz_id);
   `);
 }
-ensureTables().catch(e => console.error('ensureTables', e));
+ensureTables().catch(console.error);
 
-// ----- Quizzes -----
+// Helper: extract quiz id from various shapes
+function extractQuizId(body, req) {
+  if (!body) body = {};
+  return (
+    body.id ||
+    body.quizId ||
+    (body.data && (body.data.id || body.data.quizId)) ||
+    req.query.id ||
+    null
+  );
+}
+
+// Save/Update quiz
 app.post('/api/quizzes', async (req, res) => {
   try {
-    if (!pool) return res.status(500).json({ error: 'Storage not configured' });
-    const { id, ...rest } = req.body || {};
-    if (!id) return res.status(400).json({ error: 'Missing quiz id' });
+    const id = extractQuizId(req.body, req);
+    if (!id) {
+      return res.status(400).json({ error: 'Missing quiz id' });
+    }
+    // payload is everything except id keys so we keep UI-compatible structure
+    const { id: _i1, quizId: _i2, data: _data, ...rest } = req.body || {};
+    const payload = (_data && Object.keys(rest).length === 0) ? _data : { ...rest };
     const sql = `insert into public.quizzes (id, payload)
                  values ($1, $2::jsonb)
                  on conflict (id) do update set payload = excluded.payload`;
-    await pool.query(sql, [id, JSON.stringify(rest)]);
-    return res.json({ ok: true });
+    await pool.query(sql, [id, JSON.stringify(payload || {})]);
+    return res.json({ ok: true, id });
   } catch (e) {
     console.error('POST /api/quizzes', e);
     return res.status(500).json({ error: 'Unexpected error' });
   }
 });
 
+// Fetch quiz
 app.get('/api/quiz/:id', async (req, res) => {
   try {
-    if (!pool) return res.status(500).json({ error: 'Storage not configured' });
     const id = req.params.id;
-    const { rows } = await pool.query(
-      'select id, payload from public.quizzes where id = $1 limit 1',
-      [id]
-    );
+    const { rows } = await pool.query('select id, payload from public.quizzes where id = $1 limit 1', [id]);
     if (!rows.length) return res.status(404).json({ error: 'Quiz not found' });
     const row = rows[0];
     return res.json({ id: row.id, ...(row.payload || {}) });
@@ -85,15 +88,18 @@ app.get('/api/quiz/:id', async (req, res) => {
   }
 });
 
-// ----- Results -----
+// Save result
 app.post('/api/results', async (req, res) => {
   try {
-    if (!pool) return res.status(500).json({ error: 'Storage not configured' });
-    const { quizId, studentId, score, ...rest } = req.body || {};
+    const b = req.body || {};
+    const quizId = b.quizId || b.id || (b.data && (b.data.quizId || b.data.id));
     if (!quizId) return res.status(400).json({ error: 'Missing quizId' });
+    const studentId = b.studentId || b.sid || null;
+    const score = (typeof b.score === 'number') ? b.score : (typeof b.result === 'number' ? b.result : null);
+    const extra = b.payload || b.data || b;
     const sql = `insert into public.results (quiz_id, student_id, score, payload)
                  values ($1, $2, $3, $4::jsonb)`;
-    await pool.query(sql, [quizId, studentId || null, (typeof score === 'number' ? score : null), JSON.stringify(rest || {})]);
+    await pool.query(sql, [quizId, studentId, score, JSON.stringify(extra || {})]);
     return res.json({ ok: true });
   } catch (e) {
     console.error('POST /api/results', e);
