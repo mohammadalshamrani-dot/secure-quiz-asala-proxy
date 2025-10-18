@@ -21,11 +21,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-async function ensureTables() {
+// ---- Auto-migrations (safe & idempotent) ----
+async function migrate() {
+  // Create tables if missing
   await pool.query(`
     create table if not exists public.quizzes (
       id text primary key,
-      payload jsonb not null,
+      payload jsonb not null default '{}'::jsonb,
       created_at timestamptz default now()
     );
     create table if not exists public.results (
@@ -36,12 +38,42 @@ async function ensureTables() {
       payload jsonb,
       created_at timestamptz default now()
     );
+  `);
+  // Add missing columns safely
+  await pool.query(`
+    alter table public.quizzes
+      add column if not exists payload jsonb default '{}'::jsonb,
+      add column if not exists created_at timestamptz default now();
+    alter table public.results
+      add column if not exists student_id text,
+      add column if not exists score numeric,
+      add column if not exists payload jsonb,
+      add column if not exists created_at timestamptz default now();
     create index if not exists idx_results_quiz on public.results(quiz_id);
   `);
+  // Ensure jsonb type for quizzes.payload (convert if text)
+  await pool.query(`
+    do $$
+    begin
+      if exists (
+        select 1 from information_schema.columns
+        where table_schema='public' and table_name='quizzes' and column_name='payload' and data_type <> 'jsonb'
+      ) then
+        alter table public.quizzes
+          alter column payload type jsonb using
+            case
+              when jsonb_typeof(payload::jsonb) is not null then payload::jsonb
+              else '{}'::jsonb
+            end,
+          alter column payload set default '{}'::jsonb;
+      end if;
+    end
+    $$;
+  `);
 }
-ensureTables().catch(console.error);
+migrate().catch(e => console.error('migrate error', e));
 
-// Helper: extract quiz id from various shapes
+// Helpers
 function extractQuizId(body, req) {
   if (!body) body = {};
   return (
@@ -57,10 +89,7 @@ function extractQuizId(body, req) {
 app.post('/api/quizzes', async (req, res) => {
   try {
     const id = extractQuizId(req.body, req);
-    if (!id) {
-      return res.status(400).json({ error: 'Missing quiz id' });
-    }
-    // payload is everything except id keys so we keep UI-compatible structure
+    if (!id) return res.status(400).json({ error: 'Missing quiz id' });
     const { id: _i1, quizId: _i2, data: _data, ...rest } = req.body || {};
     const payload = (_data && Object.keys(rest).length === 0) ? _data : { ...rest };
     const sql = `insert into public.quizzes (id, payload)
@@ -69,7 +98,7 @@ app.post('/api/quizzes', async (req, res) => {
     await pool.query(sql, [id, JSON.stringify(payload || {})]);
     return res.json({ ok: true, id });
   } catch (e) {
-    console.error('POST /api/quizzes', e);
+    console.error('POST /api/quizzes error:', e);
     return res.status(500).json({ error: 'Unexpected error' });
   }
 });
@@ -83,7 +112,7 @@ app.get('/api/quiz/:id', async (req, res) => {
     const row = rows[0];
     return res.json({ id: row.id, ...(row.payload || {}) });
   } catch (e) {
-    console.error('GET /api/quiz/:id', e);
+    console.error('GET /api/quiz/:id error:', e);
     return res.status(500).json({ error: 'Unexpected error' });
   }
 });
@@ -102,7 +131,7 @@ app.post('/api/results', async (req, res) => {
     await pool.query(sql, [quizId, studentId, score, JSON.stringify(extra || {})]);
     return res.json({ ok: true });
   } catch (e) {
-    console.error('POST /api/results', e);
+    console.error('POST /api/results error:', e);
     return res.status(500).json({ error: 'Unexpected error' });
   }
 });
