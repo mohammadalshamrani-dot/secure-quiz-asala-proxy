@@ -1,4 +1,4 @@
-// Secure Quiz Asala – server.mjs (Supabase STORAGE only; no SQL needed)
+// Secure Quiz Asala – server.mjs (Supabase STORAGE, ID normalization)
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -10,9 +10,6 @@ const __dirname = path.dirname(__filename);
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('[WARN] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-}
 const supabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
   : null;
@@ -22,7 +19,17 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Helpers
+// -------- Helpers --------
+function normId(v) {
+  if (!v) return v;
+  let s = String(v).trim();
+  if (s.includes('&')) s = s.split('&')[0];
+  if (s.includes('?')) s = s.split('?')[0];
+  if (s.includes('exp=')) s = s.split('exp=')[0];
+  s = s.replace(/[^a-zA-Z0-9_-]/g, '');
+  return s;
+}
+
 async function ensureBuckets() {
   if (!supabase) return;
   const { data: buckets } = await supabase.storage.listBuckets();
@@ -30,7 +37,7 @@ async function ensureBuckets() {
   if (!names.has('quizzes')) await supabase.storage.createBucket('quizzes', { public: false });
   if (!names.has('results')) await supabase.storage.createBucket('results', { public: false });
 }
-ensureBuckets().catch(e => console.error('ensureBuckets', e));
+ensureBuckets().catch(()=>{});
 
 async function uploadJson(bucket, key, obj) {
   const json = Buffer.from(JSON.stringify(obj || {}, null, 0), 'utf-8');
@@ -45,20 +52,20 @@ async function uploadJson(bucket, key, obj) {
 async function downloadJson(bucket, key) {
   const { data, error } = await supabase.storage.from(bucket).download(key);
   if (error) throw error;
-  const arrayBuffer = await data.arrayBuffer();
-  const text = Buffer.from(arrayBuffer).toString('utf-8');
-  return JSON.parse(text || '{}');
+  const buf = await data.arrayBuffer();
+  return JSON.parse(Buffer.from(buf).toString('utf-8') || '{}');
 }
 
-// Health
+// -------- Health --------
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// Save/Update quiz
+// -------- Quizzes --------
 app.post('/api/quizzes', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
     const b = req.body || {};
-    const id = b.id || b.quizId || (b.data && (b.data.id || b.data.quizId));
+    const rawId = b.id || b.quizId || (b.data && (b.data.id || b.data.quizId));
+    const id = normId(rawId);
     if (!id) return res.status(400).json({ error: 'Missing quiz id' });
     const { id: _i1, quizId: _i2, data: _data, ...rest } = b;
     const payload = (_data && Object.keys(rest).length === 0) ? _data : { ...rest };
@@ -70,25 +77,24 @@ app.post('/api/quizzes', async (req, res) => {
   }
 });
 
-// Fetch quiz
 app.get('/api/quiz/:id', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
-    const id = req.params.id;
+    const id = normId(req.params.id);
     const data = await downloadJson('quizzes', `${id}.json`);
     return res.json({ id, ...(data || {}) });
   } catch (e) {
-    console.error('GET /api/quiz/:id', e);
     return res.status(404).json({ error: 'Quiz not found' });
   }
 });
 
-// Save result
+// -------- Results --------
 app.post('/api/results', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
     const b = req.body || {};
-    const quizId = b.quizId || b.id || (b.data && (b.data.quizId || b.data.id));
+    const rawId = b.quizId || b.id || (b.data && (b.data.quizId || b.data.id));
+    const quizId = normId(rawId);
     if (!quizId) return res.status(400).json({ error: 'Missing quizId' });
     const entry = {
       quiz_id: quizId,
