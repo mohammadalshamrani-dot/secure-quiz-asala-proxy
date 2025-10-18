@@ -1,4 +1,6 @@
-// Secure Quiz Asala – server.mjs (Supabase STORAGE, ID normalization)
+// Secure Quiz Asala – server.mjs (Supabase STORAGE)
+// Adds compatibility: supports GET /api/quiz/:id AND /api/quiz?id=...
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -19,28 +21,26 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// -------- Helpers --------
-function normId(v) {
-  if (!v) return v;
+// Helpers
+function normId(v){
+  if(!v) return v;
   let s = String(v).trim();
   if (s.includes('&')) s = s.split('&')[0];
   if (s.includes('?')) s = s.split('?')[0];
   if (s.includes('exp=')) s = s.split('exp=')[0];
-  s = s.replace(/[^a-zA-Z0-9_-]/g, '');
-  return s;
+  return s.replace(/[^a-zA-Z0-9_-]/g, '');
 }
-
-async function ensureBuckets() {
-  if (!supabase) return;
+async function ensureBuckets(){
+  if(!supabase) return;
   const { data: buckets } = await supabase.storage.listBuckets();
-  const names = new Set((buckets || []).map(b => b.name));
-  if (!names.has('quizzes')) await supabase.storage.createBucket('quizzes', { public: false });
-  if (!names.has('results')) await supabase.storage.createBucket('results', { public: false });
+  const names = new Set((buckets||[]).map(b=>b.name));
+  if(!names.has('quizzes')) await supabase.storage.createBucket('quizzes', { public:false });
+  if(!names.has('results')) await supabase.storage.createBucket('results', { public:false });
 }
 ensureBuckets().catch(()=>{});
 
-async function uploadJson(bucket, key, obj) {
-  const json = Buffer.from(JSON.stringify(obj || {}, null, 0), 'utf-8');
+async function uploadJson(bucket, key, obj){
+  const json = Buffer.from(JSON.stringify(obj||{}, null, 0), 'utf-8');
   await supabase.storage.from(bucket).remove([key]).catch(()=>{});
   const { error } = await supabase.storage.from(bucket).upload(key, json, {
     contentType: 'application/json',
@@ -48,54 +48,61 @@ async function uploadJson(bucket, key, obj) {
   });
   if (error) throw error;
 }
-
-async function downloadJson(bucket, key) {
+async function downloadJson(bucket, key){
   const { data, error } = await supabase.storage.from(bucket).download(key);
   if (error) throw error;
   const buf = await data.arrayBuffer();
   return JSON.parse(Buffer.from(buf).toString('utf-8') || '{}');
 }
 
-// -------- Health --------
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Health
+app.get('/api/health', (req,res)=>res.json({ ok:true }));
 
-// -------- Quizzes --------
-app.post('/api/quizzes', async (req, res) => {
-  try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+// Save/Update quiz
+app.post('/api/quizzes', async (req,res)=>{
+  try{
+    if(!supabase) return res.status(500).json({ error:'Storage not configured' });
     const b = req.body || {};
     const rawId = b.id || b.quizId || (b.data && (b.data.id || b.data.quizId));
     const id = normId(rawId);
-    if (!id) return res.status(400).json({ error: 'Missing quiz id' });
-    const { id: _i1, quizId: _i2, data: _data, ...rest } = b;
-    const payload = (_data && Object.keys(rest).length === 0) ? _data : { ...rest };
+    if(!id) return res.status(400).json({ error:'Missing quiz id' });
+    const { id:_1, quizId:_2, data:_d, ...rest } = b;
+    const payload = (_d && Object.keys(rest).length===0) ? _d : { ...rest };
     await uploadJson('quizzes', `${id}.json`, payload);
-    return res.json({ ok: true, id });
-  } catch (e) {
+    return res.json({ ok:true, id });
+  }catch(e){
     console.error('POST /api/quizzes', e);
-    return res.status(500).json({ error: 'Unexpected error' });
+    return res.status(500).json({ error:'Unexpected error' });
   }
 });
 
-app.get('/api/quiz/:id', async (req, res) => {
-  try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+// Fetch quiz (compat 1): /api/quiz/:id
+app.get('/api/quiz/:id', async (req,res)=>{
+  try{
+    if(!supabase) return res.status(500).json({ error:'Storage not configured' });
     const id = normId(req.params.id);
     const data = await downloadJson('quizzes', `${id}.json`);
-    return res.json({ id, ...(data || {}) });
-  } catch (e) {
-    return res.status(404).json({ error: 'Quiz not found' });
+    return res.json({ id, ...(data||{}) });
+  }catch(e){
+    return res.status(404).json({ error:'Quiz not found' });
   }
 });
+// Fetch quiz (compat 2): /api/quiz?id=...
+app.get('/api/quiz', async (req,res)=>{
+  const id = normId(req.query.id);
+  if(!id) return res.status(400).json({ error:'Missing id' });
+  req.params = { id }; // delegate to main handler logic
+  return app._router.handle({ ...req, url:`/api/quiz/${id}`, params:{id} }, res);
+});
 
-// -------- Results --------
-app.post('/api/results', async (req, res) => {
-  try {
-    if (!supabase) return res.status(500).json({ error: 'Storage not configured' });
+// Save Result
+app.post('/api/results', async (req,res)=>{
+  try{
+    if(!supabase) return res.status(500).json({ error:'Storage not configured' });
     const b = req.body || {};
     const rawId = b.quizId || b.id || (b.data && (b.data.quizId || b.data.id));
     const quizId = normId(rawId);
-    if (!quizId) return res.status(400).json({ error: 'Missing quizId' });
+    if(!quizId) return res.status(400).json({ error:'Missing quizId' });
     const entry = {
       quiz_id: quizId,
       student_id: b.studentId || b.sid || null,
@@ -105,12 +112,12 @@ app.post('/api/results', async (req, res) => {
     };
     const key = `${quizId}/${Date.now()}.json`;
     await uploadJson('results', key, entry);
-    return res.json({ ok: true });
-  } catch (e) {
+    return res.json({ ok:true });
+  }catch(e){
     console.error('POST /api/results', e);
-    return res.status(500).json({ error: 'Unexpected error' });
+    return res.status(500).json({ error:'Unexpected error' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server running on :' + PORT));
+app.listen(PORT, ()=>console.log('Server running on :' + PORT));
