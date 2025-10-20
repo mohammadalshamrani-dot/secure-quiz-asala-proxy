@@ -1,12 +1,10 @@
 {
-  "name": "secure-quiz-asala-proxy",
-  "version": "5.8.3",
+  "name": "secure-quiz-asala-rebuilt",
+  "version": "5.6.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "@supabase/supabase-js": "^2.45.6"
+    "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18"
